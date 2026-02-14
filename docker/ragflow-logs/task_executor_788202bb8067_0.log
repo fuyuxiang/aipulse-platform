@@ -1,0 +1,58 @@
+2026-01-12 15:58:54,280 INFO     55 task_executor_788202bb8067_0 log path: /ragflow/logs/task_executor_788202bb8067_0.log, log levels: {'peewee': 'WARNING', 'pdfminer': 'WARNING', 'root': 'INFO'}
+2026-01-12 15:58:54,281 INFO     55 Staggering startup by 0.22s to prevent connection storm
+2026-01-12 15:58:54,506 INFO     55 
+    ____                      __  _
+   /  _/___  ____ ____  _____/ /_(_)___  ____     ________  ______   _____  _____
+   / // __ \/ __ `/ _ \/ ___/ __/ / __ \/ __ \   / ___/ _ \/ ___/ | / / _ \/ ___/
+ _/ // / / / /_/ /  __(__  ) /_/ / /_/ / / / /  (__  )  __/ /   | |/ /  __/ /
+/___/_/ /_/\__, /\___/____/\__/_/\____/_/ /_/  /____/\___/_/    |___/\___/_/
+          /____/
+    
+2026-01-12 15:58:54,507 INFO     55 RAGFlow version: v0.23.0
+2026-01-12 15:58:54,507 INFO     55 Current configs, from /ragflow/conf/service_conf.yaml:
+	ragflow: {'host': '0.0.0.0', 'http_port': 9380}
+	admin: {'host': '0.0.0.0', 'http_port': 9381}
+	mysql: {'name': 'rag_flow', 'user': 'root', 'password': '********', 'host': 'mysql', 'port': 3306, 'max_connections': 900, 'stale_timeout': 300, 'max_allowed_packet': 1073741824}
+	minio: {'user': 'rag_flow', 'password': '********', 'host': 'docker-minio-1:9000', 'bucket': '', 'prefix_path': ''}
+	es: {'hosts': 'http://es01:9200', 'username': 'elastic', 'password': '********'}
+	os: {'hosts': 'http://opensearch01:9201', 'username': 'admin', 'password': '********'}
+	infinity: {'uri': 'infinity:23817', 'db_name': 'default_db'}
+	oceanbase: {'scheme': 'oceanbase', 'config': {'db_name': 'ragflow_doc', 'user': 'root@ragflow', 'password': 'infini_rag_flow', 'host': 'oceanbase', 'port': 2881}}
+	redis: {'db': 1, 'username': '', 'password': '********', 'host': 'docker-redis-1:6379'}
+	user_default_llm: {'default_models': {'embedding_model': {'api_key': 'xxx', 'base_url': 'http://tei:80'}}}
+2026-01-12 15:58:54,511 WARNING  55 SECURITY WARNING: Using auto-generated SECRET_KEY.
+2026-01-12 15:58:54,528 INFO     55 GET http://es01:9200/ [status:200 duration:0.011s]
+2026-01-12 15:58:54,533 INFO     55 HEAD http://es01:9200/ [status:200 duration:0.004s]
+2026-01-12 15:58:54,533 INFO     55 Use Elasticsearch http://es01:9200 as the doc engine.
+2026-01-12 15:58:54,534 INFO     55 Elasticsearch http://es01:9200 is healthy.
+2026-01-12 15:58:54,534 INFO     55 Use Elasticsearch http://es01:9200 as the doc engine.
+2026-01-12 15:58:54,534 INFO     55 Elasticsearch http://es01:9200 is healthy.
+2026-01-12 15:58:54,543 WARNING  55 Load term.freq FAIL!
+2026-01-12 15:58:54,555 WARNING  55 Realtime synonym is disabled, since no redis connection.
+2026-01-12 15:58:54,566 WARNING  55 Load term.freq FAIL!
+2026-01-12 15:58:54,572 WARNING  55 Realtime synonym is disabled, since no redis connection.
+2026-01-12 15:58:54,573 INFO     55 can't import package 'torch'
+2026-01-12 15:58:54,573 INFO     55 default embedding config: {'model': '', 'factory': '', 'api_key': 'xxx', 'base_url': 'http://tei:80'}
+2026-01-12 15:58:54,573 INFO     55 MAX_CONTENT_LENGTH: 134217728
+2026-01-12 15:58:54,573 INFO     55 MAX_FILE_COUNT_PER_USER: 0
+2026-01-12 15:58:54,575 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T15:58:54.574+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 15:58:54,576 INFO     55 task_executor_94f38aa45bd8_0 expired, removed
+2026-01-12 15:59:24,582 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T15:59:24.581+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 15:59:54,589 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T15:59:54.587+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:00:24,596 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:00:24.595+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:00:54,603 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:00:54.602+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:01:24,606 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:01:24.605+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:01:54,610 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:01:54.609+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:02:24,615 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:02:24.613+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:02:54,618 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:02:54.617+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:03:24,702 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:03:24.701+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:03:54,709 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:03:54.708+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:04:24,714 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:04:24.713+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:04:54,720 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:04:54.719+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:05:24,726 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:05:24.725+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:05:54,731 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:05:54.730+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:06:24,734 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:06:24.733+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:06:54,740 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:06:54.739+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:07:24,746 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:07:24.745+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:07:54,750 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:07:54.749+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-12 16:08:24,865 INFO     55 task_executor_788202bb8067_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_788202bb8067_0", "now": "2026-01-12T16:08:24.864+08:00", "boot_at": "2026-01-12T15:58:54.280+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
