@@ -1,0 +1,17 @@
+.menuBg {
+  width: 100%;
+  height: 72px;
+  background: url(../assets/menuBg.png) no-repeat;
+  background-position: 0 0;
+  background-size: 100% 100%;
+}
+.active {
+  border-radius: 10px;
+  background: rgba(242, 242, 242, 0.37);
+  /* border-bottom:1px solid rgba(10, 132, 255, 1); */
+}
+.activeItem {
+  /* color:red; */
+  border-radius: 6px;
+  background: rgba(38, 203, 236, 0.2);
+}

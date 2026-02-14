@@ -1,0 +1,763 @@
+2026-01-23 17:32:17,672 INFO     55 task_executor_551b93d9e8d0_0 log path: /ragflow/logs/task_executor_551b93d9e8d0_0.log, log levels: {'peewee': 'WARNING', 'pdfminer': 'WARNING', 'root': 'INFO'}
+2026-01-23 17:32:17,673 INFO     55 Staggering startup by 0.49s to prevent connection storm
+2026-01-23 17:32:18,160 INFO     55 
+    ____                      __  _
+   /  _/___  ____ ____  _____/ /_(_)___  ____     ________  ______   _____  _____
+   / // __ \/ __ `/ _ \/ ___/ __/ / __ \/ __ \   / ___/ _ \/ ___/ | / / _ \/ ___/
+ _/ // / / / /_/ /  __(__  ) /_/ / /_/ / / / /  (__  )  __/ /   | |/ /  __/ /
+/___/_/ /_/\__, /\___/____/\__/_/\____/_/ /_/  /____/\___/_/    |___/\___/_/
+          /____/
+    
+2026-01-23 17:32:18,160 INFO     55 RAGFlow version: BONC RAG version: v0.1.0-custom
+2026-01-23 17:32:18,161 INFO     55 Current configs, from /ragflow/conf/service_conf.yaml:
+	ragflow: {'host': '0.0.0.0', 'http_port': 9380}
+	admin: {'host': '0.0.0.0', 'http_port': 9381}
+	mysql: {'name': 'rag_flow', 'user': 'root', 'password': '********', 'host': 'mysql', 'port': 3306, 'max_connections': 900, 'stale_timeout': 300, 'max_allowed_packet': 1073741824}
+	minio: {'user': 'rag_flow', 'password': '********', 'host': 'docker-minio-1:9000', 'bucket': '', 'prefix_path': ''}
+	es: {'hosts': 'http://es01:9200', 'username': 'elastic', 'password': '********'}
+	os: {'hosts': 'http://opensearch01:9201', 'username': 'admin', 'password': '********'}
+	infinity: {'uri': 'infinity:23817', 'db_name': 'default_db'}
+	oceanbase: {'scheme': 'oceanbase', 'config': {'db_name': 'ragflow_doc', 'user': 'root@ragflow', 'password': 'infini_rag_flow', 'host': 'oceanbase', 'port': 2881}}
+	redis: {'db': 1, 'username': '', 'password': '********', 'host': 'docker-redis-1:6379'}
+	user_default_llm: {'default_models': {'embedding_model': {'api_key': 'xxx', 'base_url': 'http://tei:80'}}}
+2026-01-23 17:32:18,165 WARNING  55 SECURITY WARNING: Using auto-generated SECRET_KEY.
+2026-01-23 17:32:18,188 INFO     55 GET http://es01:9200/ [status:200 duration:0.014s]
+2026-01-23 17:32:18,194 INFO     55 HEAD http://es01:9200/ [status:200 duration:0.005s]
+2026-01-23 17:32:18,195 INFO     55 Use Elasticsearch http://es01:9200 as the doc engine.
+2026-01-23 17:32:18,196 INFO     55 Elasticsearch http://es01:9200 is healthy.
+2026-01-23 17:32:18,196 INFO     55 Use Elasticsearch http://es01:9200 as the doc engine.
+2026-01-23 17:32:18,196 INFO     55 Elasticsearch http://es01:9200 is healthy.
+2026-01-23 17:32:18,207 WARNING  55 Load term.freq FAIL!
+2026-01-23 17:32:18,218 WARNING  55 Realtime synonym is disabled, since no redis connection.
+2026-01-23 17:32:18,228 WARNING  55 Load term.freq FAIL!
+2026-01-23 17:32:18,233 WARNING  55 Realtime synonym is disabled, since no redis connection.
+2026-01-23 17:32:18,234 INFO     55 can't import package 'torch'
+2026-01-23 17:32:18,234 INFO     55 default embedding config: {'model': '', 'factory': '', 'api_key': 'xxx', 'base_url': 'http://tei:80'}
+2026-01-23 17:32:18,234 INFO     55 MAX_CONTENT_LENGTH: 134217728
+2026-01-23 17:32:18,234 INFO     55 MAX_FILE_COUNT_PER_USER: 0
+2026-01-23 17:32:18,236 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:32:18.236+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:32:18,238 INFO     55 task_executor_bd1c112f4fc3_0 expired, removed
+2026-01-23 17:32:48,242 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:32:48.241+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:33:18,249 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:33:18.248+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:33:48,254 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:33:48.253+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:34:18,260 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:34:18.259+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:34:48,264 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:34:48.263+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:35:18,269 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:35:18.268+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:35:48,275 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:35:48.273+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:36:18,280 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:36:18.279+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:36:48,284 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:36:48.283+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:37:18,289 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:37:18.287+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:37:48,293 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:37:48.291+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:38:18,302 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:38:18.300+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:38:48,310 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:38:48.309+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:39:18,318 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:39:18.317+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:39:48,322 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:39:48.321+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:40:18,326 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:40:18.325+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:40:48,330 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:40:48.329+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:41:18,335 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:41:18.334+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:41:48,341 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:41:48.339+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:42:18,346 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:42:18.345+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:42:48,350 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:42:48.349+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:43:18,396 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:43:18.395+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:43:48,400 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:43:48.399+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:44:18,406 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:44:18.405+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:44:48,414 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:44:48.413+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:45:18,418 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:45:18.417+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:45:48,425 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:45:48.423+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:46:18,431 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:46:18.429+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:46:48,436 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:46:48.435+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:47:18,443 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:47:18.441+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:47:48,448 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:47:48.446+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:48:18,452 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:48:18.451+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:48:48,458 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:48:48.456+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:49:18,502 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:49:18.501+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:49:48,510 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:49:48.509+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:50:18,514 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:50:18.513+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:50:48,522 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:50:48.520+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:51:18,528 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:51:18.527+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:51:48,534 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:51:48.532+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:52:18,538 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:52:18.537+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:52:48,567 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:52:48.566+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:53:18,608 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:53:18.606+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:53:48,614 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:53:48.613+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:54:18,618 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:54:18.617+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:54:48,625 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:54:48.623+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:55:18,630 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:55:18.629+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:55:48,636 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:55:48.635+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:56:18,641 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:56:18.640+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:56:48,647 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:56:48.645+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:57:18,651 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:57:18.650+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:57:48,655 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:57:48.654+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:58:18,659 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:58:18.658+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:58:48,661 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:58:48.661+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:59:18,669 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:59:18.667+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 17:59:48,674 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T17:59:48.673+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:00:18,680 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:00:18.678+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:00:48,686 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:00:48.685+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:01:18,692 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:01:18.691+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:01:48,697 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:01:48.696+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:02:18,703 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:02:18.702+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:02:48,709 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:02:48.708+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:03:18,714 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:03:18.713+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:03:48,718 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:03:48.717+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:04:18,774 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:04:18.773+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:04:48,779 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:04:48.778+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:05:18,789 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:05:18.787+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:05:48,797 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:05:48.796+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:06:18,804 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:06:18.802+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:06:48,811 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:06:48.810+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:07:18,818 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:07:18.817+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:07:48,823 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:07:48.822+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:08:18,829 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:08:18.828+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:08:48,834 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:08:48.833+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:09:18,839 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:09:18.838+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:09:48,843 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:09:48.842+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:10:18,847 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:10:18.846+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:10:48,856 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:10:48.855+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:11:18,863 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:11:18.861+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:11:48,870 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:11:48.868+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:12:18,877 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:12:18.876+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:12:48,882 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:12:48.881+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:13:18,890 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:13:18.888+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:13:48,893 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:13:48.892+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:14:18,898 INFO     55 task_executor_551b93d9e8d0_0 reported heartbeat: {"ip_address": "172.20.0.6", "pid": 55, "name": "task_executor_551b93d9e8d0_0", "now": "2026-01-23T18:14:18.897+08:00", "boot_at": "2026-01-23T17:32:17.670+08:00", "pending": 17, "lag": 0, "done": 0, "failed": 0, "current": {}}
+2026-01-23 18:14:37,706 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Connection closed by server.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 377, in queue_consumer
+    messages = self.REDIS.xreadgroup(**args)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 4017, in xreadgroup
+    return self.execute_command("XREADGROUP", *pieces)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 570, in execute_command
+    response = conn.retry.call_with_retry(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 65, in call_with_retry
+    fail(error)
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 574, in <lambda>
+    lambda error: self._disconnect_raise(conn, error),
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 556, in _disconnect_raise
+    raise error
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 571, in <lambda>
+    lambda: self._send_command_parse_response(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 543, in _send_command_parse_response
+    return self.parse_response(conn, command_name, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 590, in parse_response
+    response = connection.read_response()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 546, in read_response
+    response = self._parser.read_response(disable_decoding=disable_decoding)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/_parsers/resp2.py", line 15, in read_response
+    result = self._read_response(disable_decoding=disable_decoding)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/_parsers/resp2.py", line 25, in _read_response
+    raw = self._buffer.readline()
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/_parsers/socket.py", line 115, in readline
+    self._read_from_socket()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/_parsers/socket.py", line 68, in _read_from_socket
+    raise ConnectionError(SERVER_CLOSED_CONNECTION_ERROR)
+valkey.exceptions.ConnectionError: Connection closed by server.
+2026-01-23 18:14:37,722 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,727 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,759 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue_1 got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,764 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue_1 got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,767 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue_1 got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,771 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,776 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,780 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,959 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue_1 got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,961 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue_1 got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,962 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue_1 got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,963 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,965 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
+2026-01-23 18:14:37,966 ERROR    55 RedisDB.queue_consumer rag_flow_svr_queue got exception: Error 111 connecting to docker-redis-1:6379. Connection refused.
+Traceback (most recent call last):
+  File "/ragflow/rag/svr/task_executor.py", line 173, in collect
+    redis_msg = next(UNACKED_ITERATOR)
+                ^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 302, in connect
+    sock = self.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/retry.py", line 62, in call_with_retry
+    return do()
+           ^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 303, in <lambda>
+    lambda: self._connect(), lambda error: self.disconnect(error)
+            ^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 728, in _connect
+    raise err
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 716, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ragflow/rag/utils/redis_conn.py", line 358, in queue_consumer
+    group_info = self.REDIS.xinfo_groups(queue_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/commands/core.py", line 3810, in xinfo_groups
+    return self.execute_command("XINFO GROUPS", name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/client.py", line 564, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 1107, in get_connection
+    connection.connect()
+  File "/ragflow/.venv/lib/python3.12/site-packages/valkey/connection.py", line 308, in connect
+    raise ConnectionError(self._error_message(e))
+valkey.exceptions.ConnectionError: Error 111 connecting to docker-redis-1:6379. Connection refused.
