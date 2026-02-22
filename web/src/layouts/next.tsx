@@ -1,12 +1,14 @@
 import { Outlet } from 'umi';
-import { Header } from './next-header';
+import { SiderNav } from './sider-nav';
 
 
 export default function NextLayout() {
   return (
-    <main className="flex flex-col h-full">
-      <Header />
-      <Outlet />
+    <main className="flex h-screen overflow-hidden">
+      <SiderNav />
+      <section className="flex-1 flex flex-col overflow-hidden">
+        <Outlet />
+      </section>
     </main>
   );
 }
