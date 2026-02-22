@@ -111,7 +111,7 @@ async def login():
 
     password = json_body.get("password")
     try:
-        password = decrypt(password)
+        password = base64.b64decode(decrypt(password)).decode('utf-8')
     except BaseException:
         return get_json_result(data=False, code=RetCode.SERVER_ERROR, message="Fail to crypt password")
 
