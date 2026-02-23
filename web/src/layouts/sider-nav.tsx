@@ -114,7 +114,7 @@ export function SiderNav() {
       {/* Logo 区域 */}
       <div className="sider-logo" onClick={handleLogoClick}>
         <img src="/logoPic.png" alt="logo" className="sider-logo-img" />
-        <span className="sider-logo-text">RAGFlow</span>
+        <span className="sider-logo-text">智能体平台</span>
       </div>
 
       {/* 导航菜单 */}
