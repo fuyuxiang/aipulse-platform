@@ -1,0 +1,40 @@
+services:
+  management-frontend:
+    container_name: ragflow-admin-frontend
+    image: bonc/management-web:v0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    ports:
+      - "8888:80"
+    depends_on:
+      - management-backend
+    environment:
+      - API_BASE_URL=/api
+    networks:
+      - management_network
+
+  management-backend:
+    container_name: ragflow-admin-backend
+    image: bonc/management-server:v0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - CORS_ALLOWED_ORIGINS=http://frontend
+      - MANAGEMENT_ADMIN_USERNAME=${MANAGEMENT_ADMIN_USERNAME:-admin}
+      - MANAGEMENT_ADMIN_PASSWORD=${MANAGEMENT_ADMIN_PASSWORD:-12345678}
+      - MANAGEMENT_JWT_SECRET=${MANAGEMENT_JWT_SECRET:-12345678}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - management_network
+
+networks:
+  management_network:
+    driver: bridge

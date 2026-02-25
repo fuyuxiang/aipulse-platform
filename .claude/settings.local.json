@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker ps:*)",
+      "Bash(git -C /Users/fuyuxiang/ragflow log -1 --oneline)",
+      "Bash(lsof:*)",
+      "Bash(docker compose:*)",
+      "Bash(sudo lsof:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)",
+      "Bash(docker exec:*)",
+      "Bash(python3 -c:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker network inspect:*)",
+      "Bash(docker port:*)",
+      "Bash(docker build:*)",
+      "Bash(docker inspect:*)",
+      "Bash(git -C /Users/fuyuxiang/ragflow-main/ragflow log --oneline -10)",
+      "Bash(git -C /Users/fuyuxiang/ragflow diff:*)",
+      "Bash(ls /Users/fuyuxiang/ragflow/api/apps/*.py)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(docker --version:*)",
+      "Bash(docker rmi zstar1003/ragflowplus-management-web:v0.5.0)",
+      "Bash(docker rm:*)",
+      "Bash(docker rmi:*)",
+      "Bash(docker stop:*)"
+    ]
+  }
+}
