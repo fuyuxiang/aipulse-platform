@@ -30,9 +30,9 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'umi';
+import { useLocation } from 'react-router';
 import { BellButton } from './bell-button';
-import './next-header.css';
+
 const handleDocHelpCLick = () => {
   window.open('https://ragflow.io/docs/dev/category/guides', 'target');
 };
@@ -88,13 +88,26 @@ export function Header() {
   const options = useMemo(() => {
     return tagsData.map((tag) => {
       const HeaderIcon = tag.icon;
+
       return {
-        label: <span>{tag.name}</span>,
-        // tag.path === Routes.Root ? (
-        //   <HeaderIcon className="size-6"></HeaderIcon>
-        // ) : (
-        //   <span>{tag.name}</span>
-        // ),
+        label:
+          tag.path === Routes.Root ? (
+            <HeaderIcon className="size-6"></HeaderIcon>
+          ) : (
+            <span
+              data-testid={
+                tag.path === Routes.Chats
+                  ? 'nav-chat'
+                  : tag.path === Routes.Searches
+                    ? 'nav-search'
+                    : tag.path === Routes.Agents
+                      ? 'nav-agent'
+                      : undefined
+              }
+            >
+              {tag.name}
+            </span>
+          ),
         value: tag.path,
       };
     });
@@ -127,43 +140,45 @@ export function Header() {
   }, [pathname]);
 
   return (
-    <section className="flex items-center justify-between px-5 menuBg">
-      <div className="flex items-center ">
-        <div style={{  height: '70%' }}>
-          <img
-            src={'/logoPic.png'}
-            alt="logo"
-            className="cursor-pointer "
-            onClick={handleLogoClick}
-            style={{ width: '90%', height: '90%' }}
-          />{' '}
-        </div>
-        <Segmented
-          rounded="xxxl"
-          sizeType="xl"
-          buttonSize="xl"
-          options={options}
-          value={activePathName}
-          onChange={handleChange}
-          activeClassName="active"
-        ></Segmented>
+    <section
+      className="py-5 px-10 flex justify-between items-center "
+      data-testid="top-nav"
+    >
+      <div className="flex items-center gap-4">
+        <img
+          src={'/logo.svg'}
+          alt="logo"
+          className="size-10 mr-[12] cursor-pointer"
+          onClick={handleLogoClick}
+        />
       </div>
-
-      <div className="flex items-center gap-5 text-text-badge">
-        {/* <a
+      <Segmented
+        rounded="xxxl"
+        sizeType="xl"
+        buttonSize="xl"
+        options={options}
+        value={activePathName}
+        onChange={handleChange}
+        activeClassName="text-bg-base bg-metallic-gradient border-b-[#00BEB4] border-b-2"
+      ></Segmented>
+      <div
+        className="flex items-center gap-5 text-text-badge"
+        data-testid="auth-status"
+      >
+        <a
           target="_blank"
           href="https://discord.com/invite/NjYzJD3GM3"
           rel="noreferrer"
         >
           <IconFontFill name="a-DiscordIconSVGVectorIcon"></IconFontFill>
-        </a> */}
-        {/* <a
+        </a>
+        <a
           target="_blank"
           href="https://github.com/infiniflow/ragflow"
           rel="noreferrer"
         >
           <IconFontFill name="GitHub"></IconFontFill>
-        </a> */}
+        </a>
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div className="flex items-center gap-1">
@@ -179,19 +194,19 @@ export function Header() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* <Button variant={'ghost'} onClick={handleDocHelpCLick}>
+        <Button variant={'ghost'} onClick={handleDocHelpCLick}>
           <CircleHelp />
-        </Button> */}
-        {/* <Button variant={'ghost'} onClick={onThemeClick}>
+        </Button>
+        <Button variant={'ghost'} onClick={onThemeClick}>
           {theme === 'light' ? <Sun /> : <Moon />}
-        </Button> */}
+        </Button>
         <BellButton></BellButton>
-        <div className="relative">
+        <div className="relative" data-testid="settings-entrypoint">
           <RAGFlowAvatar
             name={nickname}
             avatar={avatar}
             isPerson
-            className="cursor-pointer size-8"
+            className="size-8 cursor-pointer"
             onClick={navigateToOldProfile}
           ></RAGFlowAvatar>
           {/* Temporarily hidden */}

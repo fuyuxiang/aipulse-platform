@@ -19,6 +19,7 @@ export default {
       portugueseBr: 'Portugués (Brasil)',
       chinese: 'Chino simplificado',
       traditionalChinese: 'Chino tradicional',
+      bulgarian: 'Búlgaro',
       language: 'Idioma',
       languageMessage: '¡Por favor ingresa tu idioma!',
       languagePlaceholder: 'Selecciona tu idioma',
@@ -159,6 +160,23 @@ export default {
       html4excelTip: `Usar junto con el método de fragmentación General. Cuando está desactivado, los archivos de hoja de cálculo (XLSX, XLS (Excel 97-2003)) se analizan línea por línea como pares clave-valor. Cuando está activado, los archivos de hoja de cálculo se convierten en tablas HTML. Si la tabla original tiene más de 12 filas, el sistema la dividirá automáticamente en varias tablas HTML cada 12 filas. Para más información, consulte https://ragflow.io/docs/dev/enable_excel2html.`,
     },
 
+    knowledgeConfiguration: {
+      paddleocrOptions: 'Opciones de PaddleOCR',
+      paddleocrApiUrl: 'URL de API de PaddleOCR',
+      paddleocrApiUrlTip:
+        'La URL del endpoint de la API para el servicio PaddleOCR',
+      paddleocrApiUrlPlaceholder: 'ej: https://servidor-paddleocr.com/api',
+      paddleocrAccessToken: 'Token de acceso de AI Studio',
+      paddleocrAccessTokenTip:
+        'Token de acceso para la API de PaddleOCR (opcional)',
+      paddleocrAccessTokenPlaceholder: 'Su token de AI Studio (opcional)',
+      paddleocrAlgorithm: 'Algoritmo de PaddleOCR',
+      paddleocrAlgorithmTip:
+        'Algoritmo a utilizar para el análisis de PaddleOCR',
+      paddleocrSelectAlgorithm: 'Seleccionar algoritmo',
+      paddleocrModelNamePlaceholder: 'ej: paddleocr-desde-env-1',
+    },
+
     // Otros bloques de traducción
     // Continua con la misma estructura
     chat: {
@@ -230,8 +248,7 @@ export default {
         'Similar a la penalización por presencia, esto reduce la tendencia del modelo a repetir las mismas palabras con frecuencia.',
       maxTokens: 'Máximo de tokens',
       maxTokensMessage: 'El máximo de tokens es obligatorio',
-      maxTokensTip:
-        'Esto establece la longitud máxima de la salida del modelo, medida en el número de tokens (palabras o piezas de palabras).',
+      maxTokensTip: `El tamaño máximo de contexto del modelo; un valor no válido o incorrecto provocará un error. Valor predeterminado: 512.`,
       maxTokensInvalidMessage:
         'Por favor, ingresa un número válido para Max Tokens.',
       maxTokensMinMessage: 'Max Tokens no puede ser menor que 0.',
@@ -286,8 +303,7 @@ export default {
       profileDescription: 'Actualiza tu foto y tus datos personales aquí.',
       maxTokens: 'Máximo de tokens',
       maxTokensMessage: 'El máximo de tokens es obligatorio',
-      maxTokensTip:
-        'Esto establece la longitud máxima de la salida del modelo, medida en el número de tokens (palabras o piezas de palabras).',
+      maxTokensTip: `El tamaño máximo de contexto del modelo; un valor no válido o incorrecto provocará un error. Valor predeterminado: 512.`,
       maxTokensInvalidMessage:
         'Por favor, ingresa un número válido para Max Tokens.',
       maxTokensMinMessage: 'Max Tokens no puede ser menor que 0.',
@@ -342,6 +358,8 @@ export default {
         'Si tu clave API es de OpenAI, ignora esto. Cualquier otro proveedor intermedio proporcionará esta URL base junto con la clave API.',
       tongyiBaseUrlTip:
         'Para usuarios chinos, no es necesario rellenar o usar https://dashscope.aliyuncs.com/compatible-mode/v1. Para usuarios internacionales, usar https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      siliconBaseUrlTip:
+        'Para usuarios chinos, no es necesario rellenar o usar https://api.siliconflow.cn/v1. Para usuarios internacionales, usar https://api.siliconflow.com/v1',
       tongyiBaseUrlPlaceholder:
         '(Solo para usuarios internacionales, por favor ver consejo)',
       minimaxBaseUrlTip:
@@ -379,6 +397,18 @@ export default {
       modelTypeMessage: '¡Por favor ingresa el tipo de tu modelo!',
       addLlmBaseUrl: 'URL base',
       baseUrlNameMessage: '¡Por favor ingresa tu URL base!',
+      paddleocr: {
+        apiUrl: 'URL de la API de PaddleOCR',
+        apiUrlPlaceholder:
+          'Por ejemplo: https://paddleocr-server.com/layout-parsing',
+        accessToken: 'Token de acceso de AI Studio',
+        accessTokenPlaceholder: 'Su token de AI Studio (opcional)',
+        algorithm: 'Algoritmo de PaddleOCR',
+        selectAlgorithm: 'Seleccionar algoritmo',
+        modelNamePlaceholder: 'Por ejemplo: paddleocr-from-env-1',
+        modelNameRequired: 'El nombre del modelo es obligatorio',
+        apiUrlRequired: 'La URL de la API de PaddleOCR es obligatoria',
+      },
       vision: '¿Soporta visión?',
       ollamaLink: 'Cómo integrar {{name}}',
       FishAudioLink: 'Cómo usar FishAudio',
@@ -402,10 +432,6 @@ export default {
       'eu-central-1': 'Europa (Frankfurt)',
       'us-gov-west-1': 'AWS GovCloud (EE. UU. Oeste)',
       'ap-southeast-2': 'Asia Pacífico (Sídney)',
-      addHunyuanSID: 'ID Secreto de Hunyuan',
-      HunyuanSIDMessage: '¡Por favor ingresa tu ID Secreto!',
-      addHunyuanSK: 'Clave Secreta de Hunyuan',
-      HunyuanSKMessage: '¡Por favor ingresa tu Clave Secreta!',
       addTencentCloudSID: 'ID Secreto de TencentCloud',
       TencentCloudSIDMessage: '¡Por favor ingresa tu ID Secreto!',
       addTencentCloudSK: 'Clave Secreta de TencentCloud',

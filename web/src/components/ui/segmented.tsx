@@ -40,8 +40,10 @@ const segmentedVariants = {
     xl: 'px-6 py-2',
   },
 };
-export interface SegmentedProps
-  extends Omit<React.HTMLProps<HTMLDivElement>, 'onChange'> {
+export interface SegmentedProps extends Omit<
+  React.HTMLProps<HTMLDivElement>,
+  'onChange'
+> {
   options: SegmentedOptions;
   defaultValue?: SegmentedValue;
   value?: SegmentedValue;
@@ -57,63 +59,71 @@ export interface SegmentedProps
   buttonSize?: keyof typeof segmentedVariants.buttonSize;
 }
 
-export function Segmented({
-  options,
-  value,
-  onChange,
-  className,
-  activeClassName,
-  itemClassName,
-  rounded = 'default',
-  sizeType = 'default',
-  buttonSize = 'default',
-}: SegmentedProps) {
-  const [selectedValue, setSelectedValue] = React.useState<
-    SegmentedValue | undefined
-  >(value);
-  React.useEffect(() => {
-    setSelectedValue(value);
-  }, [value]);
-  const handleOnChange = (e: SegmentedValue) => {
-    if (onChange) {
-      onChange(e);
-    }
-    setSelectedValue(e);
-  };
-  return (
-    <div
-      className={cn(
-        'flex items-center p-1 gap-2 ',
-        segmentedVariants.round[rounded],
-        segmentedVariants.size[sizeType],
-        className,
-      )}
-    >
-      {options.map((option) => {
-        const isObject = typeof option === 'object';
-        const actualValue = isObject ? option.value : option;
+export const Segmented = React.forwardRef<HTMLDivElement, SegmentedProps>(
+  (
+    {
+      options,
+      value,
+      onChange,
+      className,
+      activeClassName,
+      itemClassName,
+      rounded = 'default',
+      sizeType = 'default',
+      buttonSize = 'default',
+    },
+    ref,
+  ) => {
+    const [selectedValue, setSelectedValue] = React.useState<
+      SegmentedValue | undefined
+    >(value);
+    React.useEffect(() => {
+      setSelectedValue(value);
+    }, [value]);
+    const handleOnChange = (e: SegmentedValue) => {
+      if (onChange) {
+        onChange(e);
+      }
+      setSelectedValue(e);
+    };
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'flex items-center p-1 gap-2 bg-bg-card',
+          segmentedVariants.round[rounded],
+          segmentedVariants.size[sizeType],
+          className,
+        )}
+      >
+        {options.map((option) => {
+          const isObject = typeof option === 'object';
+          const actualValue = isObject ? option.value : option;
 
-        return (
-          <div
-            key={actualValue}
-            className={cn(
-              'inline-flex items-center text-base font-normal cursor-pointer',
-              segmentedVariants.round[rounded],
-              segmentedVariants.buttonSize[buttonSize],
-              {
-                'text-text-primary bg-bg-base': selectedValue === actualValue,
-              },
-              itemClassName,
-              activeClassName && selectedValue === actualValue
-                ? activeClassName
-                : '',
-            )}
-            onClick={() => handleOnChange(actualValue)}
-          >
-            {isObject ? option.label : option}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+          return (
+            <div
+              key={actualValue}
+              className={cn(
+                'inline-flex items-center text-base font-normal cursor-pointer',
+                segmentedVariants.round[rounded],
+                segmentedVariants.buttonSize[buttonSize],
+                {
+                  'text-text-primary bg-bg-base': selectedValue === actualValue,
+                },
+                itemClassName,
+                activeClassName && selectedValue === actualValue
+                  ? activeClassName
+                  : '',
+              )}
+              onClick={() => handleOnChange(actualValue)}
+            >
+              {isObject ? option.label : option}
+            </div>
+          );
+        })}
+      </div>
+    );
+  },
+);
+
+Segmented.displayName = 'Segmented';

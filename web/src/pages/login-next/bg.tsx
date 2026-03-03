@@ -123,8 +123,8 @@ export const BgSvg = ({ isPaused = false }: { isPaused?: boolean }) => {
     );
   };
   return (
-    <div className="">
-      <div className="">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none ">
+      <div className="absolute top-0 left-0 right-0 w-full">
         <div
           className={`w-full ml-10 ${animationClass}`}
           style={{ height: aspectRatio['top'] + 'px' }}

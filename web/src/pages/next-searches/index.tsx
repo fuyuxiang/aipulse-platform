@@ -9,7 +9,7 @@ import { useTranslate } from '@/hooks/common-hooks';
 import { pick } from 'lodash';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
-import { useSearchParams } from 'umi';
+import { useSearchParams } from 'react-router';
 import { useFetchSearchList, useRenameSearch } from './hooks';
 import { SearchCard } from './search-card';
 
@@ -65,7 +65,7 @@ export default function SearchList() {
   }, [isCreate, openCreateModalFun, searchUrl, setSearchUrl]);
 
   return (
-    <section className="w-full h-full flex flex-col">
+    <section className="w-full h-full flex flex-col" data-testid="search-list">
       {(!list?.data?.search_apps?.length ||
         list?.data?.search_apps?.length <= 0) &&
         !searchString && (
@@ -77,6 +77,7 @@ export default function SearchList() {
               type={EmptyCardType.Search}
               isSearch={!!searchString}
               onClick={() => openCreateModalFun()}
+              testId="search-empty-create"
             />
           </div>
         )}
@@ -92,11 +93,12 @@ export default function SearchList() {
             >
               <Button
                 variant={'default'}
+                data-testid="create-search"
                 onClick={() => {
                   openCreateModalFun();
                 }}
               >
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 {t('createSearch')}
               </Button>
             </ListFilterBar>
@@ -112,6 +114,7 @@ export default function SearchList() {
                   type={EmptyCardType.Search}
                   isSearch={!!searchString}
                   onClick={() => openCreateModalFun()}
+                  testId="search-empty-create"
                 />
               </div>
             )}

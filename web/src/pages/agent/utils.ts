@@ -1,3 +1,4 @@
+import { FormInstance, FormListFieldData } from '@/interfaces/antd-compat';
 import {
   DSL,
   GlobalVariableType,
@@ -10,7 +11,6 @@ import { DSLComponents, RAGFlowNodeType } from '@/interfaces/database/flow';
 import { buildSelectOptions } from '@/utils/component-util';
 import { buildOptions, removeUselessFieldsFromValues } from '@/utils/form';
 import { Edge, Node, XYPosition } from '@xyflow/react';
-import { FormInstance, FormListFieldData } from 'antd';
 import { humanId } from 'human-id';
 import {
   curry,
@@ -214,6 +214,7 @@ function transformParserParams(params: ParserFormSchemaType) {
         ParserFormSchemaType['setups'][0] & { suffix: string[] }
       > = {
         output_format: cur.output_format,
+        preprocess: cur.preprocess,
         suffix: FileTypeSuffixMap[cur.fileFormat as FileType],
       };
 
@@ -362,14 +363,30 @@ function transformRequestSchemaToJsonschema(
 
 function transformBeginParams(params: BeginFormSchemaType) {
   if (params.mode === AgentDialogueMode.Webhook) {
-    const nextSecurity: Record<string, any> = {
-      ...params.security,
+    const security = params.security;
+    const nextSecurity: Omit<
+      NonNullable<BeginFormSchemaType['security']>,
+      'ip_whitelist' | 'jwt'
+    > & {
+      ip_whitelist?: string[];
+      jwt?: Omit<
+        NonNullable<BeginFormSchemaType['security']>['jwt'],
+        'required_claims'
+      > & {
+        required_claims?: string[];
+      };
+    } = {
+      ...((security ?? {}) as Omit<
+        NonNullable<BeginFormSchemaType['security']>,
+        'ip_whitelist' | 'jwt'
+      >),
       ip_whitelist: params.security?.ip_whitelist.map((x) => x.value),
     };
+
     if (params.security?.auth_type === WebhookSecurityAuthType.Jwt) {
       nextSecurity.jwt = {
-        ...nextSecurity.jwt,
-        required_claims: nextSecurity.jwt?.required_claims.map((x) => x.value),
+        ...security?.jwt,
+        required_claims: security?.jwt?.required_claims.map((x) => x.value),
       };
     }
     return {
@@ -463,8 +480,8 @@ export const buildDslGlobalVariables = (
     return { globals: dsl.globals, variables: dsl.variables || {} };
   }
 
-  let globalVariablesTemp: Record<string, any> = {};
-  let globalSystem: Record<string, any> = {};
+  const globalVariablesTemp: Record<string, any> = {};
+  const globalSystem: Record<string, any> = {};
   Object.keys(dsl.globals)?.forEach((key) => {
     if (key.indexOf('sys') > -1) {
       globalSystem[key] = dsl.globals[key];
@@ -633,9 +650,9 @@ export const duplicateNodeForm = (nodeData?: RAGFlowNodeType['data']) => {
 
   // Delete the downstream node corresponding to the to field of the Categorize operator
   if (nodeData?.label === Operator.Categorize) {
-    form.category_description = Object.keys(form.category_description).reduce<
-      Record<string, Record<string, any>>
-    >((pre, cur) => {
+    form.category_description = Object.keys(
+      form?.category_description ?? {},
+    ).reduce<Record<string, Record<string, any>>>((pre, cur) => {
       pre[cur] = {
         ...form.category_description[cur],
         to: undefined,
@@ -836,7 +853,7 @@ export function buildBeginQueryWithObject(
 }
 
 export function getArrayElementType(type: string) {
-  return typeof type === 'string' ? type.match(/<([^>]+)>/)?.at(1) ?? '' : '';
+  return typeof type === 'string' ? (type.match(/<([^>]+)>/)?.at(1) ?? '') : '';
 }
 
 export function buildConversationVariableSelectOptions() {

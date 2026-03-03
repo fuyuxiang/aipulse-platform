@@ -18,6 +18,7 @@ export default {
       portugueseBr: 'Tiếng Bồ Đào Nha (Brazil)',
       chinese: 'Tiếng Trung giản thể',
       traditionalChinese: 'Tiếng Trung phồn thể',
+      bulgarian: 'Tiếng Bulgaria',
       language: 'Ngôn ngữ',
       languageMessage: 'Vui lòng chọn ngôn ngữ của bạn!',
       languagePlaceholder: 'chọn ngôn ngữ của bạn',
@@ -38,6 +39,7 @@ export default {
       spanish: 'Tiếng Tây Ban Nha',
       japanese: 'Tiếng Nhật',
       embedIntoSite: 'Nhúng vào trang web',
+      openInNewTab: 'Chat trong tab mới',
       nextPage: 'Tới',
       previousPage: 'Lùi',
     },
@@ -198,7 +200,7 @@ export default {
       chunkTokenNumber: 'Kích thước khối được khuyến nghị',
       chunkTokenNumberMessage: 'Số token khối là bắt buộc',
       embeddingModelTip:
-        'Mô hình nhúng mặc định của cơ sở tri thức. Không thể thay đổi khi cơ sở tri thức đã có các đoạn dữ liệu. Để chuyển sang mô hình nhúng mặc định khác, bạn phải xóa tất cả các đoạn dữ liệu hiện có trong cơ sở tri thức.',
+        'Mô hình nhúng mặc định của cơ sở tri thức. Khi cơ sở tri thức đã có các đoạn (chunk), lúc thay đổi mô hình nhúng, hệ thống sẽ lấy ngẫu nhiên một số chunk để kiểm tra tương thích, mã hóa lại bằng mô hình nhúng mới và tính độ tương đồng cosine giữa vector mới và vector cũ. Chỉ cho phép chuyển khi độ tương đồng trung bình của mẫu ≥ 0.9. Nếu không, bạn phải xóa tất cả các chunk trong cơ sở tri thức trước khi có thể thay đổi.',
       permissionsTip:
         'Nếu được đặt thành "Đội", tất cả các thành viên trong nhóm sẽ có thể quản lý cơ sở kiến thức.',
       chunkTokenNumberTip:
@@ -354,6 +356,18 @@ export default {
       community: 'Xây dựng mối quan hệ cộng đồng',
       communityTip:
         'Các liên kết được nhóm lại thành các cộng đồng phân cấp, với các thực thể và mối quan hệ kết nối từng phân đoạn lên các cấp độ trừu tượng cao hơn. Sau đó, chúng tôi sử dụng một LLM để tạo ra bản tóm tắt cho mỗi cộng đồng, được gọi là báo cáo cộng đồng. Xem thêm: https://www.microsoft.com/en-us/research/blog/graphrag-improving-global-search-via-dynamic-community-selection/',
+      paddleocrOptions: 'Tùy chọn PaddleOCR',
+      paddleocrApiUrl: 'URL API PaddleOCR',
+      paddleocrApiUrlTip: 'URL điểm cuối API của dịch vụ PaddleOCR',
+      paddleocrApiUrlPlaceholder:
+        'Ví dụ: https://paddleocr-server.com/layout-parsing',
+      paddleocrAccessToken: 'Token truy cập AI Studio',
+      paddleocrAccessTokenTip: 'Token truy cập cho API PaddleOCR (tùy chọn)',
+      paddleocrAccessTokenPlaceholder: 'Token AI Studio của bạn (tùy chọn)',
+      paddleocrAlgorithm: 'Thuật toán PaddleOCR',
+      paddleocrAlgorithmTip: 'Thuật toán được sử dụng để xử lý PaddleOCR',
+      paddleocrSelectAlgorithm: 'Chọn thuật toán',
+      paddleocrModelNamePlaceholder: 'Ví dụ: paddleocr-môi-trường-1',
     },
     chunk: {
       chunk: 'Khối',
@@ -446,8 +460,7 @@ export default {
         'Tương tự như hình phạt hiện diện, điều này làm giảm xu hướng của mô hình lặp lại cùng một từ thường xuyên.',
       maxTokens: 'Token tối đa',
       maxTokensMessage: 'Token tối đa là bắt buộc',
-      maxTokensTip:
-        'Điều này đặt độ dài tối đa của đầu ra của mô hình, được đo bằng số lượng token (từ hoặc phần của từ).',
+      maxTokensTip: `Kích thước ngữ cảnh tối đa của mô hình; giá trị không hợp lệ hoặc sai sẽ gây lỗi. Mặc định là 512.`,
       maxTokensInvalidMessage: 'Vui lòng nhập số Token tối đa hợp lệ.',
       maxTokensMinMessage: 'Token tối đa không thể nhỏ hơn 0.',
       quote: 'Hiển thị Trích dẫn',
@@ -512,8 +525,7 @@ export default {
       profileDescription: 'Cập nhật ảnh và thông tin cá nhân của bạn tại đây.',
       maxTokens: 'Token tối đa',
       maxTokensMessage: 'Token tối đa là bắt buộc',
-      maxTokensTip:
-        'Điều này đặt độ dài tối đa của đầu ra của mô hình, được đo bằng số lượng token (từ hoặc phần của từ).',
+      maxTokensTip: `Kích thước ngữ cảnh tối đa của mô hình; giá trị không hợp lệ hoặc sai sẽ gây lỗi. Mặc định là 512.`,
       maxTokensInvalidMessage: 'Vui lòng nhập số Token tối đa hợp lệ.',
       maxTokensMinMessage: 'Token tối đa không thể nhỏ hơn 0.',
       password: 'Mật khẩu',
@@ -561,6 +573,8 @@ export default {
       baseUrl: 'Base-Url',
       baseUrlTip:
         'Nếu khóa API của bạn từ OpenAI, chỉ cần bỏ qua nó. Bất kỳ nhà cung cấp trung gian nào khác sẽ cung cấp URL cơ sở này với khóa API.',
+      siliconBaseUrlTip:
+        'For Chinese users, no need to fill in or use https://api.siliconflow.cn/v1. For international users, use https://api.siliconflow.com/v1',
       minimaxBaseUrlTip:
         'Chỉ người dùng quốc tế: dùng https://api.minimax.io/v1.',
       minimaxBaseUrlPlaceholder:
@@ -595,6 +609,17 @@ export default {
       modelTypeMessage: 'Vui lòng nhập loại mô hình của bạn!',
       addLlmBaseUrl: 'URL cơ sở',
       baseUrlNameMessage: 'Vui lòng nhập URL cơ sở của bạn!',
+      paddleocr: {
+        apiUrl: 'URL API PaddleOCR',
+        apiUrlPlaceholder: 'Ví dụ: https://paddleocr-server.com/layout-parsing',
+        accessToken: 'Token truy cập AI Studio',
+        accessTokenPlaceholder: 'Token AI Studio của bạn (tùy chọn)',
+        algorithm: 'Thuật toán PaddleOCR',
+        selectAlgorithm: 'Chọn thuật toán',
+        modelNamePlaceholder: 'Ví dụ: paddleocr-from-env-1',
+        modelNameRequired: 'Tên mô hình là bắt buộc',
+        apiUrlRequired: 'URL API PaddleOCR là bắt buộc',
+      },
       vision: 'Có hỗ trợ Tầm nhìn không?',
       ollamaLink: 'Cách tích hợp {{name}}',
       FishAudioLink: 'Cách sử dụng FishAudio',
@@ -645,10 +670,6 @@ export default {
       'sa-east-1': 'South America (São Paulo)',
       'us-gov-east-1': 'AWS GovCloud (US-East)',
       'us-gov-west-1': 'AWS GovCloud (US-West)',
-      addHunyuanSID: 'Hunyuan Secret ID',
-      HunyuanSIDMessage: 'Vui lòng nhập ID bí mật của bạn',
-      addHunyuanSK: 'Hunyuan Secret Key',
-      HunyuanSKMessage: 'Vui lòng nhập Khóa bí mật của bạn',
       addTencentCloudSID: 'TencentCloud Secret ID',
       TencentCloudSIDMessage: 'Vui lòng nhập ID bí mật của bạn',
       addTencentCloudSK: 'TencentCloud Secret Key',
@@ -1175,8 +1196,8 @@ export default {
       toEmail: 'Email người nhận',
       smtpServerRequired: 'Vui lòng nhập địa chỉ máy chủ SMTP',
       emailContent: 'Nội dung',
-      smtpServer: 'SMTP Server',
-      smtpPort: 'SMTP Port',
+      smtpServer: 'Máy chủ SMTP',
+      smtpPort: 'Cổng SMTP',
       senderEmailRequired: 'Vui lòng nhập email người gửi',
       authCodeRequired: 'Vui lòng nhập mã xác thực',
       toEmailRequired: 'Vui lòng nhập email người nhận',
@@ -1186,9 +1207,10 @@ export default {
       jsonFormatTip:
         'Thành phần thượng nguồn phải cung cấp chuỗi JSON theo định dạng sau:',
       emailComponent: 'Email',
-      senderEmail: 'Người gửi Email',
-      authCode: 'Mã xác minh',
-      senderName: 'Tên người gửi',
+      senderEmail: 'Địa chỉ người gửi (From)',
+      smtpUsername: 'Tên đăng nhập SMTP',
+      authCode: 'Mật khẩu SMTP / mật khẩu ứng dụng',
+      senderName: 'Tên hiển thị người gửi',
       jsonUploadContentErrorMessage: 'lỗi tệp json',
       contentTip: 'content: Nội dung email (Tùy chọn)',
       subjectTip: 'subject: Tiêu đề email (Tùy chọn)',

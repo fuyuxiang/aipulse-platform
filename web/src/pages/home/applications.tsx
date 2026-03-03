@@ -6,22 +6,25 @@ import { Segmented, SegmentedValue } from '@/components/ui/segmented';
 import { Routes } from '@/routes';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'umi';
+import { useNavigate } from 'react-router';
 import { Agents } from './agent-list';
 import { SeeAllAppCard } from './application-card';
 import { ChatList } from './chat-list';
+import { MemoryList } from './memory-list';
 import { SearchList } from './search-list';
 
 const IconMap = {
   [Routes.Chats]: 'chats',
   [Routes.Searches]: 'searches',
   [Routes.Agents]: 'agents',
+  [Routes.Memories]: 'memory',
 };
 
 const EmptyTypeMap = {
   [Routes.Chats]: EmptyCardType.Chat,
   [Routes.Searches]: EmptyCardType.Search,
   [Routes.Agents]: EmptyCardType.Agent,
+  [Routes.Memories]: EmptyCardType.Memory,
 };
 
 export function Applications() {
@@ -47,6 +50,7 @@ export function Applications() {
       { value: Routes.Chats, label: t('chat.chatApps') },
       { value: Routes.Searches, label: t('search.searchApps') },
       { value: Routes.Agents, label: t('header.flow') },
+      { value: Routes.Memories, label: t('memories.memory') },
     ],
     [t],
   );
@@ -58,12 +62,12 @@ export function Applications() {
   };
 
   return (
-    <section className="mt-12" style={{background:'#fff',padding:'55px 20px',borderRadius:'4px'}}>
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-2xl font-semibold flex gap-2.5 items-center">
+    <section className="mt-12">
+      <div className="flex justify-between items-center mb-5">
+        <h2 className="text-2xl font-semibold flex gap-2.5">
           <HomeIcon
             name={`${IconMap[val as keyof typeof IconMap]}`}
-           width={'47'} height={'47'}
+            width={'32'}
           />
           {options.find((x) => x.value === val)?.label}
         </h2>
@@ -72,8 +76,8 @@ export function Applications() {
           value={val}
           onChange={handleChange}
           buttonSize="xl"
-          // className="border rounded-lg bg-bg-card border-border-button"
-          activeClassName="activeItem"
+          // className="bg-bg-card border border-border-button rounded-lg"
+          // activeClassName="bg-text-primary border-none rounded-lg"
         ></Segmented>
       </div>
       {/* <div className="flex flex-wrap gap-4"> */}
@@ -95,6 +99,12 @@ export function Applications() {
             setListLength={(length: number) => setListLength(length)}
             setLoading={(loading: boolean) => setLoading(loading)}
           ></SearchList>
+        )}
+        {val === Routes.Memories && (
+          <MemoryList
+            setListLength={(length: number) => setListLength(length)}
+            setLoading={(loading: boolean) => setLoading(loading)}
+          ></MemoryList>
         )}
         {listLength > 0 && (
           <SeeAllAppCard
