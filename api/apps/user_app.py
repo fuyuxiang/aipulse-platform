@@ -98,9 +98,7 @@ async def login():
         return get_json_result(data=False, code=RetCode.AUTHENTICATION_ERROR, message="Unauthorized!")
 
     email = json_body.get("email", "")
-    if email == "admin@ragflow.io":
-        return get_json_result(data=False, code=RetCode.AUTHENTICATION_ERROR, message="Default admin account cannot be used to login normal services!")
-    
+
     users = UserService.query(email=email)
     if not users:
         return get_json_result(
@@ -111,7 +109,7 @@ async def login():
 
     password = json_body.get("password")
     try:
-        password = base64.b64decode(decrypt(password)).decode('utf-8')
+        password = decrypt(password)
     except BaseException:
         return get_json_result(data=False, code=RetCode.SERVER_ERROR, message="Fail to crypt password")
 

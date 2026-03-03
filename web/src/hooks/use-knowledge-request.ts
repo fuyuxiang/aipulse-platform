@@ -28,7 +28,7 @@ import {
 } from '@tanstack/react-query';
 import { useDebounce } from 'ahooks';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'umi';
+import { useParams, useSearchParams } from 'react-router';
 import {
   useGetPaginationWithRouter,
   useHandleSearchChange,
@@ -101,11 +101,11 @@ export const useTestRetrieval = () => {
   });
 
   useEffect(() => {
-    if (mountedRef.current) {
+    if (mountedRef.current && !!queryParams.question) {
       refetch();
     }
     mountedRef.current = true;
-  }, [page, pageSize, refetch, filterValue]);
+  }, [page, pageSize, refetch, filterValue, queryParams]);
 
   return {
     data,

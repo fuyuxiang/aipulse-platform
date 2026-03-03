@@ -37,8 +37,13 @@ from rag.app.naive import Docx
 from rag.flow.base import ProcessBase, ProcessParamBase
 from rag.flow.parser.schema import ParserFromUpstream
 from rag.llm.cv_model import Base as VLM
+from rag.nlp import BULLET_PATTERN, bullets_category, docx_question_level, not_bullet
 from rag.utils.base64_image import image2id
 
+
+
+
+from common.misc_utils import thread_pool_exec
 
 class ParserParam(ProcessParamBase):
     def __init__(self):
@@ -61,7 +66,7 @@ class ParserParam(ProcessParamBase):
                 "json",
             ],
             "image": [
-                "text",
+                "json",
             ],
             "email": [
                 "text",
@@ -120,7 +125,7 @@ class ParserParam(ProcessParamBase):
                 "lang": "Chinese",
                 "system_prompt": "",
                 "suffix": ["jpg", "jpeg", "png", "gif"],
-                "output_format": "text",
+                "output_format": "json",
             },
             "email": {
                 "suffix": [
@@ -157,6 +162,7 @@ class ParserParam(ProcessParamBase):
                     "mkv",
                 ],
                 "output_format": "text",
+                "prompt": "",
             },
         }
 
@@ -166,7 +172,7 @@ class ParserParam(ProcessParamBase):
             pdf_parse_method = pdf_config.get("parse_method", "")
             self.check_empty(pdf_parse_method, "Parse method abnormal.")
 
-            if pdf_parse_method.lower() not in ["deepdoc", "plain_text", "mineru", "tcadp parser"]:
+            if pdf_parse_method.lower() not in ["deepdoc", "plain_text", "mineru", "tcadp parser", "paddleocr"]:
                 self.check_empty(pdf_config.get("lang", ""), "PDF VLM language")
 
             pdf_output_format = pdf_config.get("output_format", "")
@@ -218,10 +224,90 @@ class ParserParam(ProcessParamBase):
 class Parser(ProcessBase):
     component_name = "Parser"
 
-    def _pdf(self, name, blob):
+    @staticmethod
+    def _extract_word_title_lines(doc, to_page=100000):
+        lines = []
+        if not doc or not getattr(doc, "paragraphs", None):
+            return lines
+
+        pn = 0
+        bull = bullets_category([p.text for p in doc.paragraphs])
+        for p in doc.paragraphs:
+            if pn > to_page:
+                break
+            question_level, p_text = docx_question_level(p, bull)
+            lines.append((question_level, p_text))
+            for run in p.runs:
+                if "lastRenderedPageBreak" in run._element.xml:
+                    pn += 1
+                    continue
+                if "w:br" in run._element.xml and 'type="page"' in run._element.xml:
+                    pn += 1
+        return lines
+
+    @staticmethod
+    def _extract_markdown_title_lines(sections):
+        lines = []
+        if not sections:
+            return lines
+
+        section_texts = []
+        for section in sections:
+            text = section[0] if isinstance(section, tuple) else section
+            if not isinstance(text, str):
+                continue
+            text = text.strip()
+            if text:
+                section_texts.append(text)
+
+        if not section_texts:
+            return lines
+
+        bull = bullets_category(section_texts)
+        if bull < 0:
+            return lines
+
+        bullet_patterns = BULLET_PATTERN[bull]
+        default_level = len(bullet_patterns) + 1
+        for text in section_texts:
+            level = default_level
+            for idx, pattern in enumerate(bullet_patterns, start=1):
+                if re.match(pattern, text) and not not_bullet(text):
+                    level = idx
+                    break
+            lines.append((level, text))
+        return lines
+
+    @staticmethod
+    def _extract_title_texts(lines):
+        normalized_lines = []
+        level_set = set()
+        for level, txt in lines or []:
+            if not isinstance(txt, str):
+                continue
+            txt = txt.strip()
+            if not txt:
+                continue
+            normalized_lines.append((level, txt))
+            level_set.add(level)
+
+        if not normalized_lines or not level_set:
+            return set()
+
+        sorted_levels = sorted(level_set)
+        h2_level = sorted_levels[1] if len(sorted_levels) > 1 else 1
+        h2_level = sorted_levels[-2] if h2_level == sorted_levels[-1] and len(sorted_levels) > 2 else h2_level
+
+        return {txt for level, txt in normalized_lines if level <= h2_level}
+
+    def _pdf(self, name, blob, **kwargs):
         self.callback(random.randint(1, 5) / 100.0, "Start to work on a PDF.")
         conf = self._param.setups["pdf"]
         self.set_output("output_format", conf["output_format"])
+
+        abstract_enabled = "abstract" in self._param.setups["pdf"].get("preprocess", [])
+        author_enabled = "author" in self._param.setups["pdf"].get("preprocess", [])
+        title_enabled = "title" in self._param.setups["pdf"].get("preprocess", [])
 
         raw_parse_method = conf.get("parse_method", "")
         parser_model_name = None
@@ -232,6 +318,9 @@ class Parser(ProcessBase):
             if lowered.endswith("@mineru"):
                 parser_model_name = raw_parse_method.rsplit("@", 1)[0]
                 parse_method = "MinerU"
+            elif lowered.endswith("@paddleocr"):
+                parser_model_name = raw_parse_method.rsplit("@", 1)[0]
+                parse_method = "PaddleOCR"
 
         if parse_method.lower() == "deepdoc":
             bboxes = RAGFlowPdfParser().parse_into_bboxes(blob, callback=self.callback)
@@ -239,6 +328,7 @@ class Parser(ProcessBase):
             lines, _ = PlainParser()(blob)
             bboxes = [{"text": t} for t, _ in lines]
         elif parse_method.lower() == "mineru":
+
             def resolve_mineru_llm_name():
                 configured = parser_model_name or conf.get("mineru_llm_name")
                 if configured:
@@ -300,8 +390,6 @@ class Parser(ProcessBase):
                 if position_tag:
                     # Extract position information from TCADP's position tag
                     # Format: @@{page_number}\t{x0}\t{x1}\t{top}\t{bottom}##
-                    import re
-
                     match = re.match(r"@@([0-9-]+)\t([0-9.]+)\t([0-9.]+)\t([0-9.]+)\t([0-9.]+)##", position_tag)
                     if match:
                         pn, x0, x1, top, bott = match.groups()
@@ -320,6 +408,50 @@ class Parser(ProcessBase):
                         bboxes.append({"text": section})
                 else:
                     bboxes.append({"text": section})
+        elif parse_method.lower() == "paddleocr":
+
+            def resolve_paddleocr_llm_name():
+                configured = parser_model_name or conf.get("paddleocr_llm_name")
+                if configured:
+                    return configured
+
+                tenant_id = self._canvas._tenant_id
+                if not tenant_id:
+                    return None
+
+                from api.db.services.tenant_llm_service import TenantLLMService
+
+                env_name = TenantLLMService.ensure_paddleocr_from_env(tenant_id)
+                candidates = TenantLLMService.query(tenant_id=tenant_id, llm_factory="PaddleOCR", model_type=LLMType.OCR.value)
+                if candidates:
+                    return candidates[0].llm_name
+                return env_name
+
+            parser_model_name = resolve_paddleocr_llm_name()
+            if not parser_model_name:
+                raise RuntimeError("PaddleOCR model not configured. Please add PaddleOCR in Model Providers or set PADDLEOCR_* env.")
+
+            tenant_id = self._canvas._tenant_id
+            ocr_model = LLMBundle(tenant_id, LLMType.OCR, llm_name=parser_model_name)
+            pdf_parser = ocr_model.mdl
+
+            lines, _ = pdf_parser.parse_pdf(
+                filepath=name,
+                binary=blob,
+                callback=self.callback,
+                parse_method=conf.get("paddleocr_parse_method", "raw"),
+            )
+            bboxes = []
+            for t, poss in lines:
+                # Get cropped image and positions
+                cropped_image, positions = pdf_parser.crop(poss, need_position=True)
+
+                box = {
+                    "text": t,
+                    "image": cropped_image,
+                    "positions": positions,
+                }
+                bboxes.append(box)
         else:
             vision_model = LLMBundle(self._canvas._tenant_id, LLMType.IMAGE2TEXT, llm_name=conf.get("parse_method"), lang=self._param.setups["pdf"].get("lang"))
             lines, _ = VisionParser(vision_model=vision_model)(blob, callback=self.callback)
@@ -345,6 +477,70 @@ class Parser(ProcessBase):
                 b["doc_type_kwd"] = "image"
             elif layout == "table":
                 b["doc_type_kwd"] = "table"
+            if title_enabled and "title" in str(b.get("layout_type", "").lower()):
+                b["title"] = True
+
+        # Get authors
+        if author_enabled:
+
+            def _begin(txt):
+                if not isinstance(txt, str):
+                    return False
+                return re.match(
+                    r"[0-9. 一、i]*(introduction|abstract|摘要|引言|keywords|key words|关键词|background|背景|目录|前言|contents)",
+                    txt.lower().strip(),
+                )
+
+            i = 0
+            while i < min(32, len(bboxes) - 1):
+                b = bboxes[i]
+                i += 1
+                layout_type = b.get("layout_type", "")
+                layoutno = b.get("layoutno", "")
+                is_title = "title" in str(layout_type).lower() or "title" in str(layoutno).lower()
+                if not is_title:
+                    continue
+
+                title_txt = b.get("text", "")
+                if _begin(title_txt):
+                    break
+
+                for j in range(3):
+                    next_idx = i + j
+                    if next_idx >= len(bboxes):
+                        break
+                    candidate = bboxes[next_idx].get("text", "")
+                    if _begin(candidate):
+                        break
+                    if isinstance(candidate, str) and "@" in candidate:
+                        break
+                    bboxes[next_idx]["author"] = True
+                break
+
+        # Get abstract
+        if abstract_enabled:
+            i = 0
+            abstract_idx = None
+            while i + 1 < min(32, len(bboxes)):
+                b = bboxes[i]
+                i += 1
+                txt = b.get("text", "")
+                if not isinstance(txt, str):
+                    continue
+                txt = txt.lower().strip()
+                if re.match(r"(abstract|摘要)", txt):
+                    if len(txt.split()) > 32 or len(txt) > 64:
+                        abstract_idx = i - 1
+                        break
+                    next_txt = bboxes[i].get("text", "") if i < len(bboxes) else ""
+                    if isinstance(next_txt, str):
+                        next_txt = next_txt.lower().strip()
+                        if len(next_txt.split()) > 32 or len(next_txt) > 64:
+                            abstract_idx = i
+                    i += 1
+                    break
+            if abstract_idx is not None:
+                bboxes[abstract_idx]["abstract"] = True
 
         if conf.get("output_format") == "json":
             self.set_output("json", bboxes)
@@ -359,7 +555,7 @@ class Parser(ProcessBase):
                 mkdn += b.get("text", "") + "\n"
             self.set_output("markdown", mkdn)
 
-    def _spreadsheet(self, name, blob):
+    def _spreadsheet(self, name, blob, **kwargs):
         self.callback(random.randint(1, 5) / 100.0, "Start to work on a Spreadsheet.")
         conf = self._param.setups["spreadsheet"]
         self.set_output("output_format", conf["output_format"])
@@ -444,15 +640,26 @@ class Parser(ProcessBase):
             elif conf.get("output_format") == "markdown":
                 self.set_output("markdown", spreadsheet_parser.markdown(blob))
 
-    def _word(self, name, blob):
+    def _word(self, name, blob, **kwargs):
         self.callback(random.randint(1, 5) / 100.0, "Start to work on a Word Processor Document")
         conf = self._param.setups["word"]
         self.set_output("output_format", conf["output_format"])
         docx_parser = Docx()
 
         if conf.get("output_format") == "json":
-            sections, tbls = docx_parser(name, binary=blob)
-            sections = [{"text": section[0], "image": section[1]} for section in sections if section]
+            main_sections = docx_parser(name, binary=blob)
+            title_lines = self._extract_word_title_lines(getattr(docx_parser, "doc", None))
+            title_texts = self._extract_title_texts(title_lines)
+            sections = []
+            tbls = []
+            for text, image, html in main_sections:
+                section = {"text": text, "image": image}
+                text_key = text.strip() if isinstance(text, str) else ""
+                if text_key and text_key in title_texts and "title" in self._param.setups["word"].get("preprocess", []):
+                    section["title"] = True
+                sections.append(section)
+                tbls.append(((None, html), ""))
+
             sections.extend([{"text": tb, "image": None, "doc_type_kwd": "table"} for ((_, tb), _) in tbls])
 
             self.set_output("json", sections)
@@ -460,7 +667,8 @@ class Parser(ProcessBase):
             markdown_text = docx_parser.to_markdown(name, binary=blob)
             self.set_output("markdown", markdown_text)
 
-    def _slides(self, name, blob):
+
+    def _slides(self, name, blob, **kwargs):
         self.callback(random.randint(1, 5) / 100.0, "Start to work on a PowerPoint Document")
 
         conf = self._param.setups["slides"]
@@ -525,7 +733,7 @@ class Parser(ProcessBase):
             if conf.get("output_format") == "json":
                 self.set_output("json", sections)
 
-    def _markdown(self, name, blob):
+    def _markdown(self, name, blob, **kwargs):
         from functools import reduce
 
         from rag.app.naive import Markdown as naive_markdown_parser
@@ -546,11 +754,16 @@ class Parser(ProcessBase):
 
         if conf.get("output_format") == "json":
             json_results = []
+            title_lines = self._extract_markdown_title_lines(sections)
+            title_texts = self._extract_title_texts(title_lines)
 
             for idx, (section_text, _) in enumerate(sections):
                 json_result = {
                     "text": section_text,
                 }
+                text_key = section_text.strip() if isinstance(section_text, str) else ""
+                if text_key and text_key in title_texts and "title" in self._param.setups["text&markdown"].get("preprocess", []):
+                    json_result["title"] = True
 
                 images = []
                 if section_images and len(section_images) > idx and section_images[idx] is not None:
@@ -566,7 +779,7 @@ class Parser(ProcessBase):
         else:
             self.set_output("text", "\n".join([section_text for section_text, _ in sections]))
 
-    def _image(self, name, blob):
+    def _image(self, name, blob, **kwargs):
         from deepdoc.vision import OCR
 
         self.callback(random.randint(1, 5) / 100.0, "Start to work on an image.")
@@ -594,9 +807,14 @@ class Parser(ProcessBase):
             else:
                 txt = cv_model.describe(img_binary.read())
 
-        self.set_output("text", txt)
+        json_result = [{
+            "text": txt,
+            "image": img,
+            "doc_type_kwd": "image",
+        }]
+        self.set_output("json", json_result)
 
-    def _audio(self, name, blob):
+    def _audio(self, name, blob, **kwargs):
         import os
         import tempfile
 
@@ -615,18 +833,19 @@ class Parser(ProcessBase):
 
             self.set_output("text", txt)
 
-    def _video(self, name, blob):
+    def _video(self, name, blob, **kwargs):
         self.callback(random.randint(1, 5) / 100.0, "Start to work on an video.")
 
         conf = self._param.setups["video"]
         self.set_output("output_format", conf["output_format"])
 
         cv_mdl = LLMBundle(self._canvas.get_tenant_id(), LLMType.IMAGE2TEXT, llm_name=conf["llm_id"])
-        txt = asyncio.run(cv_mdl.async_chat(system="", history=[], gen_conf={}, video_bytes=blob, filename=name))
+        video_prompt = str(conf.get("prompt", "") or "")
+        txt = asyncio.run(cv_mdl.async_chat(system="", history=[], gen_conf={}, video_bytes=blob, filename=name, video_prompt=video_prompt))
 
         self.set_output("text", txt)
 
-    def _email(self, name, blob):
+    def _email(self, name, blob, **kwargs):
         self.callback(random.randint(1, 5) / 100.0, "Start to work on an email.")
 
         email_content = {}
@@ -792,7 +1011,11 @@ class Parser(ProcessBase):
         for p_type, conf in self._param.setups.items():
             if from_upstream.name.split(".")[-1].lower() not in conf.get("suffix", []):
                 continue
-            await asyncio.to_thread(function_map[p_type], name, blob)
+            call_kwargs = dict(kwargs)
+            call_kwargs.pop("name", None)
+            call_kwargs.pop("blob", None)
+
+            await thread_pool_exec(function_map[p_type], name, blob, **call_kwargs)
             done = True
             break
 
@@ -802,7 +1025,7 @@ class Parser(ProcessBase):
         outs = self.output()
         tasks = []
         for d in outs.get("json", []):
-            tasks.append(asyncio.create_task(image2id(d,partial(settings.STORAGE_IMPL.put, tenant_id=self._canvas._tenant_id),get_uuid())))
+            tasks.append(asyncio.create_task(image2id(d, partial(settings.STORAGE_IMPL.put, tenant_id=self._canvas._tenant_id), get_uuid())))
 
         try:
             await asyncio.gather(*tasks, return_exceptions=False)

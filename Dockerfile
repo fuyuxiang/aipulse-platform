@@ -7,7 +7,7 @@ ARG NEED_MIRROR=0
 
 WORKDIR /ragflow
 
-# Copy models downloaded via download_deps.py
+# copy models downloaded via download_deps.py
 RUN mkdir -p /ragflow/rag/res/deepdoc /root/.ragflow
 RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/huggingface.co,target=/huggingface.co \
     tar --exclude='.*' -cf - \
@@ -28,8 +28,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Setup apt
 # Python package and implicit dependencies:
 # opencv-python: libglib2.0-0 libglx-mesa0 libgl1
-# aspose-slides: pkg-config libicu-dev libgdiplus         libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-# python-pptx:   default-jdk                              tika-server-standard-3.0.0.jar
+# python-pptx:   default-jdk                              tika-server-standard-3.2.3.jar
 # selenium:      libatk-bridge2.0-0                       chrome-linux64-121-0-6167-85
 # Building C extensions: libpython3-dev libgtk-4-1 libnss3 xdg-utils libgbm-dev
 RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
@@ -49,11 +48,21 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y libatk-bridge2.0-0 && \
     apt install -y libpython3-dev libgtk-4-1 libnss3 xdg-utils libgbm-dev && \
     apt install -y libjemalloc-dev && \
-    apt install -y nginx unzip curl wget git vim less && \
+    apt install -y gnupg unzip curl wget git vim less && \
     apt install -y ghostscript && \
     apt install -y pandoc && \
     apt install -y texlive && \
-    apt install -y fonts-freefont-ttf fonts-noto-cjk
+    apt install -y fonts-freefont-ttf fonts-noto-cjk && \
+    apt install -y postgresql-client
+
+ARG NGINX_VERSION=1.29.5-1~noble
+RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o /etc/apt/keyrings/nginx-archive-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/ubuntu/ noble nginx" > /etc/apt/sources.list.d/nginx.list && \
+    apt update && \
+    apt install -y nginx=${NGINX_VERSION} && \
+    apt-mark hold nginx
 
 # Install uv
 RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
@@ -64,10 +73,12 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps 
         echo 'url = "https://pypi.tuna.tsinghua.edu.cn/simple"' >> /etc/uv/uv.toml && \
         echo 'default = true' >> /etc/uv/uv.toml; \
     fi; \
-    tar xzf /deps/uv-x86_64-unknown-linux-gnu.tar.gz \
-    && cp uv-x86_64-unknown-linux-gnu/* /usr/local/bin/ \
-    && rm -rf uv-x86_64-unknown-linux-gnu \
-    && uv python install 3.11
+    arch="$(uname -m)"; \
+    if [ "$arch" = "x86_64" ]; then uv_arch="x86_64"; else uv_arch="aarch64"; fi; \
+    tar xzf "/deps/uv-${uv_arch}-unknown-linux-gnu.tar.gz" \
+    && cp "uv-${uv_arch}-unknown-linux-gnu/"* /usr/local/bin/ \
+    && rm -rf "uv-${uv_arch}-unknown-linux-gnu" \
+    && uv python install 3.12
 
 ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ENV PATH=/root/.local/bin:$PATH
@@ -125,8 +136,6 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/chromedriver-l
     mv chromedriver /usr/local/bin/ && \
     rm -f /usr/bin/google-chrome
 
-# https://forum.aspose.com/t/aspose-slides-for-net-no-usable-version-of-libssl-found-with-linux-server/271344/13
-# aspose-slides on linux/arm64 is unavailable
 RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
     if [ "$(uname -m)" = "x86_64" ]; then \
         dpkg -i /deps/libssl1.1_1.1.1f-1ubuntu2_amd64.deb; \
@@ -146,39 +155,29 @@ COPY pyproject.toml uv.lock ./
 
 # https://github.com/astral-sh/uv/issues/10462
 # uv records index url into uv.lock but doesn't failover among multiple indexes
-#RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
-#    if [ "$NEED_MIRROR" == "1" ]; then \
-#        sed -i 's|pypi.org|pypi.tuna.tsinghua.edu.cn|g' uv.lock; \
-#    else \
-#        sed -i 's|pypi.tuna.tsinghua.edu.cn|pypi.org|g' uv.lock; \
-#    fi; \
-#    uv sync --python 3.12 --frozen
 RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
     if [ "$NEED_MIRROR" == "1" ]; then \
-        # Force HTTP/1.1 to avoid PROTOCOL_ERROR
-        git config --global http.version HTTP/1.1; \
-        # Configure Proxy
-	git config --global url."https://ghproxy.cc/https://github.com/".insteadOf "https://github.com/"; \
-        # Configure PyPI Mirror
         sed -i 's|pypi.org|pypi.tuna.tsinghua.edu.cn|g' uv.lock; \
     else \
         sed -i 's|pypi.tuna.tsinghua.edu.cn|pypi.org|g' uv.lock; \
     fi; \
-    uv sync --python 3.12 --frozen
-
+    uv sync --python 3.12 --frozen && \
+    # Ensure pip is available in the venv for runtime package installation (fixes #12651)
+    .venv/bin/python3 -m ensurepip --upgrade
 
 COPY web web
 COPY docs docs
 RUN --mount=type=cache,id=ragflow_npm,target=/root/.npm,sharing=locked \
+    export NODE_OPTIONS="--max-old-space-size=4096" && \
     cd web && npm install && npm run build
 
-#COPY .git /ragflow/.git
+COPY .git /ragflow/.git
 
-#RUN version_info=$(git describe --tags --match=v* --first-parent --always); \
-#    version_info="$version_info"; \
-#    echo "RAGFlow version: $version_info"; \
-#    echo $version_info > /ragflow/VERSION
-RUN echo "BONC RAG version: v0.1.0-custom" > /ragflow/VERSION
+RUN version_info=$(git describe --tags --match=v* --first-parent --always); \
+    version_info="$version_info"; \
+    echo "RAGFlow version: $version_info"; \
+    echo $version_info > /ragflow/VERSION
+
 # production stage
 FROM base AS production
 USER root
@@ -199,11 +198,8 @@ COPY conf conf
 COPY deepdoc deepdoc
 COPY rag rag
 COPY agent agent
-COPY graphrag graphrag
-COPY agentic_reasoning agentic_reasoning
 COPY pyproject.toml uv.lock ./
 COPY mcp mcp
-COPY plugin plugin
 COPY common common
 COPY memory memory
 

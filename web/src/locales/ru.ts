@@ -26,6 +26,7 @@ export default {
       chinese: 'Китайский упрощенный',
       traditionalChinese: 'Китайский традиционный',
       russian: 'Русский',
+      bulgarian: 'Болгарский',
       language: 'Язык',
       languageMessage: 'Пожалуйста, укажите ваш язык!',
       languagePlaceholder: 'выберите ваш язык',
@@ -44,6 +45,7 @@ export default {
       submit: 'Отправить',
       clear: 'Очистить',
       embedIntoSite: 'Встроить на веб-страницу',
+      openInNewTab: 'Чат в новой вкладке',
       previousPage: 'Назад',
       nextPage: 'Вперед',
       add: 'Добавить',
@@ -123,7 +125,7 @@ export default {
       generate: 'Сгенерировать',
       raptor: 'RAPTOR',
       processingType: 'Тип обработки',
-      dataPipeline: 'Пайплайн обработки',
+      dataPipeline: 'Переключить или настроить конвейер приема данных.',
       operations: 'Операции',
       taskId: 'ID задачи',
       duration: 'Продолжительность',
@@ -315,7 +317,7 @@ export default {
       linkPipelineSetTip:
         'Управление связью пайплайна обработки с этим набором данных',
       default: 'По умолчанию',
-      dataPipeline: 'Пайплайн обработки',
+      dataPipeline: 'Переключить или настроить конвейер приема данных',
       linkDataPipeline: 'Связать пайплайн обработки',
       enableAutoGenerate: 'Включить авто-генерацию',
       teamPlaceholder: 'Пожалуйста, выберите команду.',
@@ -329,7 +331,7 @@ export default {
         'Обновите конфигурацию вашей базы знаний здесь, особенно метод чанкинга.',
       name: 'Название базы знаний',
       photo: 'Фото базы знаний',
-      photoTip: 'Вы можете загрузить файл размером до 4 МБ',
+      photoTip: 'Вы можете загрузить изображение до 4 МБ.',
       description: 'Описание',
       language: 'Язык документа',
       languageMessage: 'Пожалуйста, укажите ваш язык!',
@@ -339,7 +341,7 @@ export default {
       chunkTokenNumber: 'Рекомендуемый размер чанка',
       chunkTokenNumberMessage: 'Требуется количество токенов чанка для текста',
       embeddingModelTip:
-        'Модель эмбеддингов по умолчанию для базы знаний. Она не может быть изменена после того, как в базе знаний есть чанки. Чтобы переключиться на другую модель эмбеддингов по умолчанию, вы должны удалить все существующие чанки в базе знаний.',
+        'Модель эмбеддингов по умолчанию для базы знаний. После того как в базе знаний появились чанки, при смене модели эмбеддингов система случайным образом выбирает несколько чанков для проверки совместимости, заново кодирует их новой моделью эмбеддингов и вычисляет косинусное сходство между новыми и старыми векторами. Переключение возможно только если среднее сходство по выборке ≥ 0.9. В противном случае необходимо удалить все чанки в базе знаний, чтобы изменить модель.',
       permissionsTip:
         "Если установлено значение 'Команда', все члены вашей команды смогут управлять базой знаний.",
       chunkTokenNumberTip:
@@ -510,6 +512,18 @@ export default {
         'В графе знаний сообщество - это кластер сущностей, связанных отношениями. Вы можете поручить LLM генерировать аннотацию для каждого сообщества, известную как отчет сообщества. Более подробная информация здесь: https://www.microsoft.com/en-us/research/blog/graphrag-improving-global-search-via-dynamic-community-selection/',
       theDocumentBeingParsedCannotBeDeleted:
         'Документ, который в данный момент парсится, не может быть удален',
+      paddleocrOptions: 'Параметры PaddleOCR',
+      paddleocrApiUrl: 'URL API PaddleOCR',
+      paddleocrApiUrlTip: 'URL конечной точки API сервиса PaddleOCR',
+      paddleocrApiUrlPlaceholder:
+        'Например: https://paddleocr-server.com/layout-parsing',
+      paddleocrAccessToken: 'Токен доступа AI Studio',
+      paddleocrAccessTokenTip: 'Токен доступа к API PaddleOCR (необязательно)',
+      paddleocrAccessTokenPlaceholder: 'Ваш токен AI Studio (необязательно)',
+      paddleocrAlgorithm: 'Алгоритм PaddleOCR',
+      paddleocrAlgorithmTip: 'Алгоритм, используемый для обработки PaddleOCR',
+      paddleocrSelectAlgorithm: 'Выбрать алгоритм',
+      paddleocrModelNamePlaceholder: 'Например: paddleocr-среда-1',
     },
     chunk: {
       chunk: 'Чанк',
@@ -616,7 +630,7 @@ export default {
         'Подобно штрафу за присутствие, это снижает тенденцию модели часто повторять одни и те же слова.',
       maxTokens: 'Макс. токенов',
       maxTokensMessage: 'Макс. токенов обязательно',
-      maxTokensTip: `Это устанавливает максимальную длину вывода модели, измеряемую в количестве токенов (слов или частей слов). По умолчанию 512. Если отключено, вы снимаете ограничение на максимальное количество токенов, позволяя модели определять количество токенов в своих ответах.`,
+      maxTokensTip: `Максимальный размер контекста mодель; недопустимое или неверное значение приведёт к ошибке. По умолчанию 512.`,
       maxTokensInvalidMessage:
         'Пожалуйста, введите действительное число для Макс. Токенов.',
       maxTokensMinMessage: 'Макс. Токенов не может быть меньше 0.',
@@ -716,7 +730,7 @@ export default {
         'Базовый URL вашего экземпляра Confluence (например, https://your-domain.atlassian.net/wiki)',
       confluenceSpaceKeyTip:
         'Необязательно: Укажите ключ пространства для синхронизации только определенного пространства. Оставьте пустым для синхронизации всех доступных пространств. Для нескольких пространств разделите запятыми (например, DEV,DOCS,HR)',
-      s3PrefixTip: `Укажите путь к папке в вашем S3 бакете для получения файлов. 
+      s3PrefixTip: `Укажите путь к папке в вашем S3 бакете для получения файлов.
 Пример: general/v2/`,
       S3CompatibleEndpointUrlTip: `Требуется для S3 совместимого Storage Box. Укажите URL конечной точки, совместимой с S3.
 Пример: https://fsn1.your-objectstorage.com`,
@@ -731,6 +745,7 @@ export default {
       newDocs: 'Новые документы',
       timeStarted: 'Время начала',
       log: 'Лог',
+      connectorNameTip: 'Укажите понятное имя для коннектора',
       confluenceDescription:
         'Интегрируйте ваше рабочее пространство Confluence для поиска документации.',
       s3Description:
@@ -747,6 +762,18 @@ export default {
         'Синхронизируйте страницы и базы данных из Notion для извлечения знаний.',
       boxDescription:
         'Подключите ваш диск Box для синхронизации файлов и папок.',
+      bitbucketDescription:
+        'Подключите Bitbucket для синхронизации содержимого PR.',
+      zendeskDescription:
+        'Подключите Zendesk для синхронизации тикетов, статей и другого контента.',
+      bitbucketTopWorkspaceTip:
+        'Рабочее пространство Bitbucket для индексации (например, "atlassian" из https://bitbucket.org/atlassian/workspace )',
+      bitbucketWorkspaceTip:
+        'Этот коннектор проиндексирует все репозитории в рабочем пространстве.',
+      bitbucketProjectsTip:
+        'Ключи проектов через запятую, например: PROJ1,PROJ2',
+      bitbucketRepositorySlugsTip:
+        'Слоги репозиториев через запятую, например: repo-one,repo-two',
       githubDescription:
         'Подключите GitHub для синхронизации содержимого Pull Request и Issue для поиска.',
       airtableDescription:
@@ -812,7 +839,7 @@ export default {
       profileDescription: 'Обновите ваше фото и личные данные здесь.',
       maxTokens: 'Макс. Токенов',
       maxTokensMessage: 'Макс. Токенов обязательно',
-      maxTokensTip: `Это устанавливает максимальную длину вывода модели, измеряемую в количестве токенов (слов или частей слов). По умолчанию 512. Если отключено, вы снимаете ограничение на максимальное количество токенов, позволяя модели определять количество токенов в своих ответах.`,
+      maxTokensTip: `Максимальный размер контекста mодель; недопустимое или неверное значение приведёт к ошибке. По умолчанию 512.`,
       maxTokensInvalidMessage:
         'Пожалуйста, введите действительное число для Макс. Токенов.',
       maxTokensMinMessage: 'Макс. Токенов не может быть меньше 0.',
@@ -867,6 +894,8 @@ export default {
         'Если ваш API ключ от OpenAI, просто проигнорируйте это. Любые другие промежуточные провайдеры дадут этот базовый url вместе с API ключом.',
       tongyiBaseUrlTip:
         'Для китайских пользователей не нужно заполнять или используйте https://dashscope.aliyuncs.com/compatible-mode/v1. Для международных пользователей используйте https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      siliconBaseUrlTip:
+        'Для китайских пользователей не нужно заполнять или используйте https://api.siliconflow.cn/v1. Для международных пользователей используйте https://api.siliconflow.com/v1',
       tongyiBaseUrlPlaceholder:
         '(Только для международных пользователей, см. подсказку)',
       minimaxBaseUrlTip:
@@ -955,10 +984,6 @@ export default {
       'sa-east-1': 'Южная Америка (Сан-Паулу)',
       'us-gov-east-1': 'AWS GovCloud (US-East)',
       'us-gov-west-1': 'AWS GovCloud (US-West)',
-      addHunyuanSID: 'Hunyuan Secret ID',
-      HunyuanSIDMessage: 'Пожалуйста, введите ваш Secret ID',
-      addHunyuanSK: 'Hunyuan Secret Key',
-      HunyuanSKMessage: 'Пожалуйста, введите ваш Secret Key',
       addTencentCloudSID: 'TencentCloud Secret ID',
       TencentCloudSIDMessage: 'Пожалуйста, введите ваш Secret ID',
       addTencentCloudSK: 'TencentCloud Secret Key',
@@ -1021,6 +1046,18 @@ export default {
       modelsToBeAddedTooltip:
         'Если ваш провайдер моделей не указан, но заявляет о "совместимости с OpenAI-API", выберите карточку OpenAI-API-compatible, чтобы добавить соответствующие модели. ',
       mcp: 'MCP',
+      paddleocr: {
+        apiUrl: 'URL API PaddleOCR',
+        apiUrlPlaceholder:
+          'Например: https://paddleocr-server.com/layout-parsing',
+        accessToken: 'Токен доступа AI Studio',
+        accessTokenPlaceholder: 'Ваш токен AI Studio (необязательно)',
+        algorithm: 'Алгоритм PaddleOCR',
+        selectAlgorithm: 'Выбрать алгоритм',
+        modelNamePlaceholder: 'Например: paddleocr-from-env-1',
+        modelNameRequired: 'Имя модели является обязательным',
+        apiUrlRequired: 'URL API PaddleOCR является обязательным',
+      },
     },
     message: {
       registered: 'Зарегистрирован!',
@@ -1589,11 +1626,12 @@ export default {
         'Компонент, который форматирует вывод других компонентов.1. Поддерживает шаблоны Jinja2, сначала преобразует вход в объект, а затем рендерит шаблон, 2. Одновременно сохраняет исходный метод использования замены строки {parameter}',
       emailComponent: 'Email',
       emailDescription: 'Отправить email на указанный адрес.',
-      smtpServer: 'SMTP Сервер',
-      smtpPort: 'SMTP Порт',
-      senderEmail: 'Email отправителя',
-      authCode: 'Код авторизации',
-      senderName: 'Имя отправителя',
+      smtpServer: 'SMTP хост',
+      smtpPort: 'SMTP порт',
+      senderEmail: 'Адрес отправителя (From)',
+      smtpUsername: 'Имя пользователя SMTP',
+      authCode: 'Пароль SMTP / пароль приложения',
+      senderName: 'Отображаемое имя отправителя',
       toEmail: 'Email получателя',
       ccEmail: 'Email копии',
       emailSubject: 'Тема',
@@ -1711,7 +1749,7 @@ export default {
       conversational: 'Диалоговый',
       task: 'Задача',
       beginInputTip:
-        'Определяя входные параметры, это содержимое может быть доступно другим компонентам в последующих процессах.',
+        'Параметры ввода, определённые здесь, могут быть доступны компонентам в последующем рабочем процессе.',
       query: 'Переменные запроса',
       queryRequired: 'Запрос обязателен',
       queryTip: 'Выберите переменную, которую хотите использовать',
@@ -2003,6 +2041,7 @@ export default {
       korean: 'Корейский',
       vietnamese: 'Вьетнамский',
       russian: 'Русский',
+      bulgarian: 'Болгарский',
     },
     pagination: {
       total: 'Всего {{total}}',

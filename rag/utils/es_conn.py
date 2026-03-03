@@ -28,6 +28,8 @@ from common.float_utils import get_float
 from common.constants import PAGERANK_FLD, TAG_FLD
 
 ATTEMPT_TIME = 2
+MAX_RESULT_WINDOW = 10000
+SEARCH_AFTER_BATCH_SIZE = 1000
 
 
 @singleton
@@ -35,6 +37,81 @@ class ESConnection(ESConnectionBase):
     """
     CRUD operations
     """
+
+    def _es_search_once(self, index_names: list[str], query: dict, track_total_hits: bool):
+        return self.es.search(
+            index=index_names,
+            body=query,
+            timeout="600s",
+            track_total_hits=track_total_hits,
+            _source=True,
+        )
+
+    def _search_with_search_after(self, index_names: list[str], query: dict, offset: int, limit: int):
+        q_base = copy.deepcopy(query)
+        q_base.pop("from", None)
+        q_base.pop("size", None)
+
+        search_after = None
+        template_res = None
+        collected_hits = []
+        remaining_skip = max(0, offset)
+        remaining_take = max(0, limit)
+        with_aggs = True
+
+        while remaining_skip > 0:
+            batch = min(SEARCH_AFTER_BATCH_SIZE, remaining_skip)
+            q_iter = copy.deepcopy(q_base)
+            q_iter["size"] = batch
+            if search_after is not None:
+                q_iter["search_after"] = search_after
+            if not with_aggs:
+                q_iter.pop("aggs", None)
+            res = self._es_search_once(index_names, q_iter, track_total_hits=template_res is None)
+            if template_res is None:
+                template_res = res
+            hits = res.get("hits", {}).get("hits", [])
+            if not hits:
+                break
+            next_search_after = hits[-1].get("sort")
+            if not next_search_after or next_search_after == search_after:
+                break
+            search_after = next_search_after
+            remaining_skip -= len(hits)
+            with_aggs = False
+            if len(hits) < batch:
+                break
+
+        while remaining_skip <= 0 and remaining_take > 0:
+            batch = min(SEARCH_AFTER_BATCH_SIZE, remaining_take)
+            q_iter = copy.deepcopy(q_base)
+            q_iter["size"] = batch
+            if search_after is not None:
+                q_iter["search_after"] = search_after
+            if not with_aggs:
+                q_iter.pop("aggs", None)
+            res = self._es_search_once(index_names, q_iter, track_total_hits=template_res is None)
+            if template_res is None:
+                template_res = res
+            hits = res.get("hits", {}).get("hits", [])
+            if not hits:
+                break
+            collected_hits.extend(hits)
+            remaining_take -= len(hits)
+            next_search_after = hits[-1].get("sort")
+            if not next_search_after or next_search_after == search_after:
+                break
+            search_after = next_search_after
+            with_aggs = False
+            if len(hits) < batch:
+                break
+
+        if template_res is None:
+            q_count = copy.deepcopy(q_base)
+            q_count["size"] = 0
+            template_res = self._es_search_once(index_names, q_count, track_total_hits=True)
+        template_res["hits"]["hits"] = collected_hits
+        return template_res
 
     def search(
             self, select_fields: list[str],
@@ -139,20 +216,27 @@ class ESConnection(ESConnectionBase):
             for fld in agg_fields:
                 s.aggs.bucket(f'aggs_{fld}', 'terms', field=fld, size=1000000)
 
-        if limit > 0:
+        has_dense = any(isinstance(m, MatchDenseExpr) for m in match_expressions)
+        has_explicit_sort = bool(order_by and order_by.fields)
+        use_search_after = (
+            limit > 0
+            and (offset + limit > MAX_RESULT_WINDOW)
+            and has_explicit_sort
+            and not has_dense
+        )
+
+        if limit > 0 and not use_search_after:
             s = s[offset:offset + limit]
         q = s.to_dict()
         self.logger.debug(f"ESConnection.search {str(index_names)} query: " + json.dumps(q))
 
         for i in range(ATTEMPT_TIME):
             try:
-                # print(json.dumps(q, ensure_ascii=False))
-                res = self.es.search(index=index_names,
-                                     body=q,
-                                     timeout="600s",
-                                     # search_type="dfs_query_then_fetch",
-                                     track_total_hits=True,
-                                     _source=True)
+                if use_search_after:
+                    res = self._search_with_search_after(index_names, q, offset, limit)
+                else:
+                    # print(json.dumps(q, ensure_ascii=False))
+                    res = self._es_search_once(index_names, q, track_total_hits=True)
                 if str(res.get("timed_out", "")).lower() == "true":
                     raise Exception("Es Timeout.")
                 self.logger.debug(f"ESConnection.search {str(index_names)} res: " + str(res))
@@ -162,7 +246,11 @@ class ESConnection(ESConnectionBase):
                 self._connect()
                 continue
             except Exception as e:
-                self.logger.exception(f"ESConnection.search {str(index_names)} query: " + str(q) + str(e))
+                # Only log debug for NotFoundError(accepted when metadata index doesn't exist)
+                if 'NotFound' in str(e):
+                    self.logger.debug(f"ESConnection.search {str(index_names)} query: " + str(q) + " - " + str(e))
+                else:
+                    self.logger.exception(f"ESConnection.search {str(index_names)} query: " + str(q) + str(e))
                 raise e
 
         self.logger.error(f"ESConnection.search timeout for {ATTEMPT_TIME} times!")
@@ -303,32 +391,43 @@ class ESConnection(ESConnectionBase):
     def delete(self, condition: dict, index_name: str, knowledgebase_id: str) -> int:
         assert "_id" not in condition
         condition["kb_id"] = knowledgebase_id
+
+        # Build a bool query that combines id filter with other conditions
+        bool_query = Q("bool")
+
+        # Handle chunk IDs if present
         if "id" in condition:
             chunk_ids = condition["id"]
             if not isinstance(chunk_ids, list):
                 chunk_ids = [chunk_ids]
-            if not chunk_ids:  # when chunk_ids is empty, delete all
-                qry = Q("match_all")
-            else:
-                qry = Q("ids", values=chunk_ids)
+            if chunk_ids:
+                # Filter by specific chunk IDs
+                bool_query.filter.append(Q("ids", values=chunk_ids))
+            # If chunk_ids is empty, we don't add an ids filter - rely on other conditions
+
+        # Add all other conditions as filters
+        for k, v in condition.items():
+            if k == "id":
+                continue  # Already handled above
+            if k == "exists":
+                bool_query.filter.append(Q("exists", field=v))
+            elif k == "must_not":
+                if isinstance(v, dict):
+                    for kk, vv in v.items():
+                        if kk == "exists":
+                            bool_query.must_not.append(Q("exists", field=vv))
+            elif isinstance(v, list):
+                bool_query.must.append(Q("terms", **{k: v}))
+            elif isinstance(v, str) or isinstance(v, int):
+                bool_query.must.append(Q("term", **{k: v}))
+            elif v is not None:
+                raise Exception("Condition value must be int, str or list.")
+
+        # If no filters were added, use match_all (for tenant-wide operations)
+        if not bool_query.filter and not bool_query.must and not bool_query.must_not:
+            qry = Q("match_all")
         else:
-            qry = Q("bool")
-            for k, v in condition.items():
-                if k == "exists":
-                    qry.filter.append(Q("exists", field=v))
-
-                elif k == "must_not":
-                    if isinstance(v, dict):
-                        for kk, vv in v.items():
-                            if kk == "exists":
-                                qry.must_not.append(Q("exists", field=vv))
-
-                elif isinstance(v, list):
-                    qry.must.append(Q("terms", **{k: v}))
-                elif isinstance(v, str) or isinstance(v, int):
-                    qry.must.append(Q("term", **{k: v}))
-                else:
-                    raise Exception("Condition value must be int, str or list.")
+            qry = bool_query
         self.logger.debug("ESConnection.delete query: " + json.dumps(qry.to_dict()))
         for _ in range(ATTEMPT_TIME):
             try:

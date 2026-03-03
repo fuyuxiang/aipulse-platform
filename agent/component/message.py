@@ -27,13 +27,15 @@ from functools import partial
 from typing import Any
 
 from agent.component.base import ComponentBase, ComponentParamBase
-from jinja2 import Template as Jinja2Template
+from jinja2.sandbox import SandboxedEnvironment
+
+_jinja2_sandbox = SandboxedEnvironment()
 
 from common.connection_utils import timeout
 from common.misc_utils import get_uuid
 from common import settings
 
-from api.db.joint_services.memory_message_service import save_to_memory
+from api.db.joint_services.memory_message_service import queue_save_to_memory_task
 
 
 class MessageParam(ComponentParamBase):
@@ -187,7 +189,7 @@ class Message(ComponentBase):
             return
 
         rand_cnt, kwargs = self.get_kwargs(rand_cnt, kwargs)
-        template = Jinja2Template(rand_cnt)
+        template = _jinja2_sandbox.from_string(rand_cnt)
         try:
             content = template.render(kwargs)
         except Exception:
@@ -437,17 +439,4 @@ class Message(ComponentBase):
             "user_input": self._canvas.get_sys_query(),
             "agent_response": content
         }
-        res = []
-        for memory_id in self._param.memory_ids:
-            success, msg = await save_to_memory(memory_id, message_dict)
-            res.append({
-                "memory_id": memory_id,
-                "success": success,
-                "msg": msg
-            })
-        if all([r["success"] for r in res]):
-            return True, "Successfully added to memories."
-
-        error_text = "Some messages failed to add. " + " ".join([f"Add to memory {r['memory_id']} failed, detail: {r['msg']}" for r in res if not r["success"]])
-        logging.error(error_text)
-        return False, error_text
+        return await queue_save_to_memory_task(self._param.memory_ids, message_dict)

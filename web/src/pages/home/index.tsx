@@ -4,9 +4,9 @@ import { Datasets } from './datasets';
 
 const Home = () => {
   return (
-    <section style={{ background: 'rgba(248, 248, 248, 1)', height: '100%' }}>
-      {/* <NextBanner></NextBanner> */}
-      <section className="px-10 py-10 overflow-auto " style={{background:'rgba(248, 248, 248, 1)',height:'100%'}}>
+    <section>
+      <NextBanner></NextBanner>
+      <section className="h-[calc(100dvh-260px)] overflow-auto px-10">
         <Datasets></Datasets>
         <Applications></Applications>
       </section>

@@ -14,7 +14,6 @@ type ThemeProviderState = {
 
 const initialState: ThemeProviderState = {
   theme: ThemeEnum.Light,
-  // theme: ThemeEnum.Light,
   setTheme: () => null,
 };
 

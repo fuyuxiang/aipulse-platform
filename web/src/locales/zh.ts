@@ -26,6 +26,7 @@ export default {
       portugueseBr: '葡萄牙语 (巴西)',
       chinese: '简体中文',
       traditionalChinese: '繁体中文',
+      bulgarian: '保加利亚语',
       language: '语言',
       languageMessage: '请输入语言',
       languagePlaceholder: '请选择语言',
@@ -44,6 +45,7 @@ export default {
       submit: '提交',
       clear: '清空',
       embedIntoSite: '嵌入网站',
+      openInNewTab: '在新标签页中聊天',
       previousPage: '上一页',
       nextPage: '下一页',
       add: '添加',
@@ -53,8 +55,10 @@ export default {
       noData: '暂无数据',
       bedrockCredentialsHint:
         '提示：Access Key / Secret Key 可留空，以启用 AWS IAM 自动验证。',
+      zendeskDescription: '连接 Zendesk，同步工单、文章及其他内容。',
       promptPlaceholder: '请输入或使用 / 快速插入变量。',
       selected: '已选择',
+      seeAll: '查看全部',
     },
     login: {
       loginTitle: '登录账户',
@@ -81,7 +85,6 @@ export default {
       review: '来自 500 多条评论',
     },
     header: {
-      Root:'个人主页',
       knowledgeBase: '知识库',
       chat: '聊天',
       register: '注册',
@@ -101,7 +104,7 @@ export default {
       embeddingModelTooltip:
         '将文本转换为数值向量，用于语义相似度搜索和记忆检索。',
       embeddingModelError: '记忆类型为必填项，且"原始"类型不可删除。',
-      memoryTypeTooltip: `原始: 用户与代理之间的原始对话内容（默认必需）。
+      memoryTypeTooltip: `原始: 用户与智能体之间的原始对话内容（默认必需）。
 语义记忆: 关于用户和世界的通用知识和事实。
 情景记忆: 带时间戳的特定事件和经历记录。
 程序记忆: 学习的技能、习惯和自动化程序。`,
@@ -118,15 +121,16 @@ export default {
       embeddingModel: '嵌入模型',
       selectModel: '选择模型',
       llm: '大语言模型',
-      delMemoryWarn: `删除后，此记忆中的所有消息都将被删除，代理将无法检索。`,
+      delMemoryWarn: `删除后，此记忆中的所有消息都将被删除，智能体将无法检索。`,
     },
     memory: {
       messages: {
+        forget: '遗忘',
         forgetMessageTip: '确定遗忘吗？',
         messageDescription: '记忆提取使用高级设置中的提示词和温度值进行配置。',
         copied: '已复制！',
         content: '内容',
-        delMessageWarn: `遗忘后，代理将无法检索此消息。`,
+        delMessageWarn: `遗忘后，智能体将无法检索此消息。`,
         forgetMessage: '遗忘消息',
         sessionId: '会话ID',
         agent: '智能体',
@@ -174,11 +178,17 @@ export default {
     },
     knowledgeDetails: {
       metadata: {
+        fields: '字段',
+        selectFiles: '已选择 {{count}} 个文件',
+        type: '类型',
+        fieldNameInvalid: '字段名称只能包含字母或下划线。',
+        builtIn: '内置',
+        generation: '生成',
         toMetadataSettingTip: '在配置中设置自动元数据',
         toMetadataSetting: '生成设置',
         descriptionTip:
           '提供描述或示例来指导大语言模型为此字段提取值。如果留空，将依赖字段名称。',
-        restrictTDefinedValuesTip:
+        restrictDefinedValuesTip:
           '枚举模式：限制大语言模型提取的值只能匹配预设值。在下方定义值。',
         valueExists: '值已存在。确认合并重复项并组合所有关联文件。',
         fieldNameExists: '字段名已存在。确认合并重复项并组合所有关联文件。',
@@ -187,10 +197,10 @@ export default {
         fieldExists: '字段名已存在。',
         fieldSetting: '字段设置',
         changesAffectNewParses: '更改仅影响新的解析。',
-        editMetadataForDataset: '查看和编辑元数据 ',
+        // editMetadataForDataset: '查看和编辑元数据 ',
         restrictDefinedValues: '限制为已定义的值',
         metadataGenerationSettings: '元数据生成设置',
-        manageMetadataForDataset: '管理此数据集的元数据',
+        // manageMetadataForDataset: '管理此数据集的元数据',
         manageMetadata: '管理元数据',
         metadata: '元数据',
         values: '值',
@@ -200,6 +210,7 @@ export default {
         description: '描述',
         fieldName: '字段名称',
         editMetadata: '编辑元数据',
+        addMetadata: '添加元数据',
         deleteWarn: '此 {{field}} 将从所有关联文件中移除',
         deleteManageFieldAllWarn:
           '此字段及其所有对应值将从所有关联的文件中删除。',
@@ -224,7 +235,7 @@ export default {
       generate: '生成',
       raptor: 'RAPTOR',
       processingType: '处理类型',
-      dataPipeline: '数据管道',
+      dataPipeline: '切换或配置 ingestion pipeline。',
       operations: '操作',
       taskId: '任务ID',
       duration: '耗时',
@@ -376,6 +387,8 @@ export default {
     },
     knowledgeConfiguration: {
       settings: '设置',
+      autoMetadataTip:
+        '自动生成元数据。适用于解析新文件。现有文件需要重新解析才能更新（chunk将保留）。请注意，配置中指定的索引模型将消耗额外的 Token。',
       imageTableContextWindow: '图像与表格上下文窗口',
       imageTableContextWindowTip:
         '抓取图像与表格上下方的 N 个 token，为该 chunk 提供更丰富的背景上下文。',
@@ -389,6 +402,18 @@ export default {
         '启用公式识别。注意：对于西里尔文档可能无法正常工作。',
       mineruTableEnable: '表格识别',
       mineruTableEnableTip: '启用表格识别和提取。',
+      paddleocrOptions: 'PaddleOCR 选项',
+      paddleocrApiUrl: 'PaddleOCR API URL',
+      paddleocrApiUrlTip: 'PaddleOCR 服务的 API 端点 URL',
+      paddleocrApiUrlPlaceholder:
+        '例如：https://paddleocr-server.com/layout-parsing',
+      paddleocrAccessToken: 'AI Studio 访问令牌',
+      paddleocrAccessTokenTip: 'PaddleOCR API 的访问令牌（可选）',
+      paddleocrAccessTokenPlaceholder: '您的 AI Studio 令牌（可选）',
+      paddleocrAlgorithm: 'PaddleOCR 算法',
+      paddleocrAlgorithmTip: '用于 PaddleOCR 解析的算法',
+      paddleocrSelectAlgorithm: '选择算法',
+      paddleocrModelNamePlaceholder: '例如：paddleocr-环境-1',
       generationScopeTip: '选择 RAPTOR 的生成范围：整个知识库或单个文件。',
       generationScope: '生成范围',
       scopeSingleFile: '单文件',
@@ -402,7 +427,7 @@ export default {
       linkSourceSetTip: '管理与此数据集的数据源链接',
       linkDataSource: '链接数据源',
       tocExtractionTip:
-        '对于已有的chunk生成层级结构的目录信息（每个文件一个目录）。在查询时，激活`目录增强`后，系统会用大模型去判断用户问题和哪些目录项相关，从而找到相关的chunk。',
+        '对于已有的chunk生成层级结构的目录信息（每个文件一个目录）。在查询时，激活`Page Index`后，系统会用大模型去判断用户问题和哪些目录项相关，从而找到相关的chunk。',
       deleteGenerateModalContent: `
         <p>删除生成的 <strong class='text-text-primary'>{{type}}</strong> 结果
           将从此数据集中移除所有派生实体和关系。
@@ -420,7 +445,7 @@ export default {
       editLinkDataPipeline: '编辑pipeline',
       linkPipelineSetTip: '管理与此数据集的数据管道链接',
       default: '默认',
-      dataPipeline: 'Ingestion pipeline',
+      dataPipeline: '切换或配置 ingestion pipeline。',
       linkDataPipeline: '关联pipeline',
       enableAutoGenerate: '是否启用自动生成',
       teamPlaceholder: '请选择团队',
@@ -443,7 +468,7 @@ export default {
       chunkTokenNumber: '建议文本块大小',
       chunkTokenNumberMessage: '块Token数是必填项',
       embeddingModelTip:
-        '知识库采用的默认嵌入模型。 一旦知识库内已经产生了文本块后，你将无法更改默认的嵌入模型，除非删除知识库内的所有文本块。',
+        '知识库采用的默认嵌入模型。一旦知识库内已经产生了文本块，更换嵌入模型时，系统将随机抽取若干 chunk 进行兼容性校验，使用新嵌入模型重新编码并计算新旧向量的余弦相似度，样本平均相似度需 ≥ 0.9 方可切换。否则，必须删除知识库内的所有文本块后才能更改。',
       permissionsTip:
         '如果把知识库权限设为“团队”，则所有团队成员都可以操作该知识库。',
       chunkTokenNumberTip:
@@ -730,8 +755,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         '与存在惩罚类似，这减少了模型频繁重复相同单词的倾向。',
       maxTokens: '最大token数',
       maxTokensMessage: '最大token数是必填项',
-      maxTokensTip:
-        '这设置了模型输出的最大长度，以标记（单词或单词片段）的数量来衡量。',
+      maxTokensTip: `模型的最大上下文大小；无效或不正确的值会导致错误。默认值为 512。`,
       maxTokensInvalidMessage: '请输入有效的最大令牌数。',
       maxTokensMinMessage: '最大令牌数不能小于 0。',
       quote: '显示引文',
@@ -810,10 +834,15 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       chatSetting: '聊天设置',
       avatarHidden: '隐藏头像',
       locale: '地区',
-      tocEnhance: '目录增强',
-      tocEnhanceTip: `解析文档时生成了目录信息（见General方法的‘启用目录抽取’），让大模型返回和用户问题相关的目录项，从而利用目录项拿到相关chunk，对这些chunk在排序中进行加权。这种方法来源于模仿人类查询书本中知识的行为逻辑`,
+      tocEnhance: 'PageIndex',
+      tocEnhanceTip: `解析文档时生成了目录信息（见General方法的'启用目录抽取'），让大模型返回和用户问题相关的目录项，从而利用目录项拿到相关chunk，对这些chunk在排序中进行加权。这种方法来源于模仿人类查询书本中知识的行为逻辑`,
+      batchDeleteSessions: '批量删除',
+      deleteSelectedConfirm: '删除选中的 {count} 个会话？',
     },
     setting: {
+      Verify: '验证',
+      keyValid: '你的 API 密钥有效。',
+      keyInvalid: '你的 API 密钥无效。',
       deleteModel: '删除模型',
       modelEmptyTip: '暂无可用模型,<br>请先在右侧面板添加模型。',
       sourceEmptyTip: '暂未添加任何数据源，请从下方选择一个进行连接。',
@@ -865,6 +894,14 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         '请上传由 Google Console 生成的 OAuth JSON。如果仅包含 client credentials，请通过浏览器授权一次以获取长期有效的刷新 Token。',
       dropboxDescription: '连接 Dropbox，同步指定账号下的文件与文件夹。',
       boxDescription: '连接你的 Box 云盘以同步文件和文件夹。',
+      bitbucketDescription: '连接 Bitbucket，同步 PR 内容。',
+      bitbucketTopWorkspaceTip:
+        '要索引的 Bitbucket 工作区（例如：https://bitbucket.org/atlassian/workspace 中的 "atlassian"）',
+      bitbucketWorkspaceTip: '该连接器将索引工作区下的所有仓库。',
+      bitbucketProjectsTip: '用英文逗号分隔的项目 key，例如：PROJ1,PROJ2',
+      bitbucketRepositorySlugsTip:
+        '用英文逗号分隔的仓库 slug，例如：repo-one,repo-two',
+      connectorNameTip: '为连接器命名',
       githubDescription:
         '连接 GitHub，可同步 Pull Request 与 Issue 内容用于检索。',
       airtableDescription: '连接 Airtable，同步指定工作区下指定表格中的文件。',
@@ -905,8 +942,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       profileDescription: '在此更新您的照片和个人详细信息。',
       maxTokens: '最大token数',
       maxTokensMessage: '最大token数是必填项',
-      maxTokensTip:
-        '这设置了模型输出的最大长度，以标记（单词或单词片段）的数量来衡量。',
+      maxTokensTip: `模型的最大上下文大小；无效或不正确的值会导致错误。默认值为 512。`,
       maxTokensInvalidMessage: '请输入有效的最大令牌数。',
       maxTokensMinMessage: '最大令牌数不能小于 0。',
       password: '密码',
@@ -955,6 +991,8 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         '如果您的 API 密钥来自 OpenAI，请忽略它。 任何其他中间提供商都会提供带有 API 密钥的基本 URL。',
       tongyiBaseUrlTip:
         '对于中国用户，不需要填写或使用 https://dashscope.aliyuncs.com/compatible-mode/v1。对于国际用户，使用 https://dashscope-intl.aliyuncs.com/compatible-mode/v1。',
+      siliconBaseUrlTip:
+        '对于中国用户，不需要填写或使用 https://api.siliconflow.cn/v1。对于国际用户，使用 https://api.siliconflow.com/v1。',
       tongyiBaseUrlPlaceholder: '(仅国际用户需要)',
       minimaxBaseUrlTip: '仅国际用户：使用 https://api.minimax.io/v1。',
       minimaxBaseUrlPlaceholder: '(仅国际用户填写 https://api.minimax.io/v1)',
@@ -1021,10 +1059,6 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       'eu-central-1': '欧洲 (法兰克福)',
       'us-gov-west-1': 'AWS GovCloud (US-West)',
       'ap-southeast-2': '亚太地区 (悉尼)',
-      addHunyuanSID: '混元 Secret ID',
-      HunyuanSIDMessage: '请输入 Secret ID',
-      addHunyuanSK: '混元 Secret Key',
-      HunyuanSKMessage: '请输入 Secret Key',
       addTencentCloudSID: '腾讯云 Secret ID',
       TencentCloudSIDMessage: '请输入 Secret ID',
       addTencentCloudSK: '腾讯云 Secret Key',
@@ -1104,6 +1138,19 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
           vlmLmdeployEngine: '基于LMDeploy引擎的视觉语言模型（实验性）',
         },
       },
+      paddleocr: {
+        apiUrl: 'PaddleOCR API URL',
+        apiUrlPlaceholder: '例如：https://paddleocr-server.com/layout-parsing',
+        accessToken: 'AI Studio访问令牌',
+        accessTokenPlaceholder: '您的 AI Studio 令牌（可选）',
+        algorithm: 'PaddleOCR算法',
+        selectAlgorithm: '选择算法',
+        modelNamePlaceholder: '例如：paddleocr-from-env-1',
+        modelNameRequired: '模型名称为必填项',
+        apiUrlRequired: 'PaddleOCR API URL 为必填项',
+      },
+      showToc: '显示目录',
+      hideToc: '隐藏目录',
     },
     message: {
       registered: '注册成功',
@@ -1164,6 +1211,13 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       pleaseUploadAtLeastOneFile: '请上传至少一个文件',
     },
     flow: {
+      preprocess: {
+        preprocess: '预处理',
+        mainContent: '主内容',
+        abstract: '摘要',
+        author: '作者',
+        sectionTitle: '章节标题',
+      },
       autoPlay: '自动播放',
       downloadFileTypeTip: '文件下载的类型',
       downloadFileType: '文件类型',
@@ -1683,11 +1737,12 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         '该组件用于排版各种组件的输出。1、支持Jinja2模板,会先将输入转为对象后进行模版渲染2、同时保留原使用{参数}字符串替换的方式',
       emailComponent: '邮件',
       emailDescription: '发送邮件到指定邮箱',
-      smtpServer: 'SMTP服务器',
-      smtpPort: 'SMTP端口',
-      senderEmail: '发件人邮箱',
-      authCode: '授权码',
-      senderName: '发件人名称',
+      smtpServer: 'SMTP服务器地址',
+      smtpPort: 'SMTP端口号',
+      senderEmail: '发件邮箱地址（From）',
+      smtpUsername: 'SMTP登录用户名',
+      authCode: 'SMTP登录密码/授权码',
+      senderName: '发件人显示名称',
       toEmail: '收件人邮箱',
       ccEmail: '抄送邮箱',
       emailSubject: '邮件主题',
@@ -1857,7 +1912,7 @@ Tokenizer 会根据所选方式将内容存储为对应的数据结构。`,
       keywords: '关键词',
       questions: '问题',
       metadata: '元数据',
-      toc: '目录',
+      toc: 'PageIndex',
       fieldName: '结果目的地',
       prompts: {
         system: {
@@ -2065,6 +2120,7 @@ Tokenizer 会根据所选方式将内容存储为对应的数据结构。`,
       japanese: '日语',
       korean: '韩语',
       vietnamese: '越南语',
+      bulgarian: '保加利亚语',
     },
     pagination: {
       total: '总共 {{total}} 条',
@@ -2130,6 +2186,7 @@ Tokenizer 会根据所选方式将内容存储为对应的数据结构。`,
       delFilesContent: '已选择 {{count}} 个文件',
       delChat: '删除聊天',
       delMember: '删除成员',
+      delMemory: '删除记忆',
     },
 
     empty: {
@@ -2145,6 +2202,24 @@ Tokenizer 会根据所选方式将内容存储为对应的数据结构。`,
       memoryTitle: '尚未创建记忆',
       notFoundMemory: '未查询到记忆',
       addNow: '立即添加',
+    },
+
+    explore: {
+      title: '探索',
+      canvasList: '画布列表',
+      sessions: '会话列表',
+      newSession: '新建会话',
+      newSessionLabel: '开始新对话',
+      deleteSession: '删除会话',
+      searchCanvas: '搜索画布...',
+      searchSessions: '搜索会话...',
+      noCanvasSelected: '请选择一个画布',
+      noSessionSelected: '请选择一个会话或创建新会话',
+      noSessionsFound: '未找到会话',
+      createFirstSession: '创建您的第一个会话',
+      noCanvasFound: '未找到画布',
+      deleteSelectedConfirm: '确定要删除 {{count}} 个会话吗？',
+      batchDeleteSessions: '删除会话',
     },
   },
 };

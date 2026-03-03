@@ -35,7 +35,7 @@ export const FilterButton = React.forwardRef<
         Filter
       </span> */}
       {count > 0 && (
-        <span className="px-1 text-xs rounded-full bg-text-badge ">
+        <span className="rounded-full bg-text-badge px-1 text-xs ">
           {count}
         </span>
       )}
@@ -44,6 +44,7 @@ export const FilterButton = React.forwardRef<
   );
 });
 
+FilterButton.displayName = 'FilterButton';
 export default function ListFilterBar({
   title,
   children,
@@ -88,13 +89,13 @@ export default function ListFilterBar({
       <div className="text-2xl font-semibold flex items-center gap-2.5">
         {typeof icon === 'string' ? (
           // <IconFont name={icon} className="size-6"></IconFont>
-          <HomeIcon name={`${icon}`}  width={'47'} height={'47'}/>
+          <HomeIcon name={`${icon}`} width={'32'} />
         ) : (
           icon
         )}
         {leftPanel || title}
       </div>
-      <div className="flex items-center gap-5">
+      <div className="flex gap-5 items-center">
         {preChildren}
         {showFilter && (
           <FilterPopover

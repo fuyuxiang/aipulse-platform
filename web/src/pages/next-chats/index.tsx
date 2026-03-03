@@ -10,7 +10,7 @@ import { pick } from 'lodash';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'umi';
+import { useSearchParams } from 'react-router';
 import { ChatCard } from './chat-card';
 import { useRenameChat } from './hooks/use-rename-chat';
 
@@ -49,7 +49,7 @@ export default function ChatList() {
   }, [isCreate, handleShowCreateModal, searchParams, setSearchParams]);
 
   return (
-    <section className="flex flex-col w-full flex-1">
+    <section className="flex flex-col w-full flex-1" data-testid="chats-list">
       {data.dialogs?.length <= 0 && !searchString && (
         <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
           <EmptyAppCard
@@ -59,6 +59,7 @@ export default function ChatList() {
             isSearch={!!searchString}
             type={EmptyCardType.Chat}
             onClick={() => handleShowCreateModal()}
+            testId="chats-empty-create"
           />
         </div>
       )}
@@ -71,8 +72,8 @@ export default function ChatList() {
               onSearchChange={handleInputChange}
               searchString={searchString}
             >
-              <Button onClick={handleShowCreateModal}>
-                <Plus className="size-2.5" />
+              <Button onClick={handleShowCreateModal} data-testid="create-chat">
+                <Plus className="h-4 w-4" />
                 {t('chat.createChat')}
               </Button>
             </ListFilterBar>
@@ -86,6 +87,7 @@ export default function ChatList() {
                 isSearch={!!searchString}
                 type={EmptyCardType.Chat}
                 onClick={() => handleShowCreateModal()}
+                testId="chats-empty-create"
               />
             </div>
           )}

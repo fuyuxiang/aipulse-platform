@@ -1,7 +1,0 @@
-{
-    "i18n-ally.localesPaths": [
-        "src/locales",
-        "src/components/jsonjoy-builder/i18n",
-        "src/components/jsonjoy-builder/i18n/locales"
-    ]
-}

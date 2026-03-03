@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Optional, List, Sequence, NamedTuple
 from typing_extensions import TypedDict, NotRequired
 from pydantic import BaseModel
+from enum import Enum
 
 
 @dataclass(frozen=True)
@@ -94,8 +95,10 @@ class Document(BaseModel):
     blob: bytes
     doc_updated_at: datetime
     size_bytes: int
+    externale_access: Optional[ExternalAccess] = None
     primary_owners: Optional[list] = None
     metadata: Optional[dict[str, Any]] = None
+    doc_metadata: Optional[dict[str, Any]] = None
 
 
 class BasicExpertInfo(BaseModel):
@@ -304,6 +307,11 @@ class ProcessedSlackMessage:
         self.failure = failure
 
 
+class SeafileSyncScope(str, Enum):
+    """Defines how much of SeaFile to synchronise."""
+    ACCOUNT = "account"      # All libraries the token can see
+    LIBRARY = "library"      # A single library (repo)
+    DIRECTORY = "directory"  # A single directory inside a library
 # Type aliases for type hints
 SecondsSinceUnixEpoch = float
 GenerateDocumentsOutput = Any
