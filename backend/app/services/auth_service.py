@@ -45,6 +45,7 @@ class AuthService:
                 user.failed_login_count += 1
             self.db.commit()
             raise AppError(ErrorCode.UNAUTHORIZED, "invalid tenant or credentials", 401)
+        assert user is not None
         user.failed_login_count = 0
         user.last_login_at = utcnow()
         self.audit.record(tenant_id=tenant.id, user_id=user.id, action="login", resource_type="users", resource_id=user.id, ip_address=ip, user_agent=user_agent)
@@ -165,4 +166,3 @@ def ensure_default_identity(db: Session) -> dict[str, str]:
         db.add(UserRole(tenant_id=tenant.id, user_id=user.id, role_id=role.id, created_by=user.id, updated_by=user.id))
     db.commit()
     return {"tenant_id": tenant.id, "user_id": user.id}
-

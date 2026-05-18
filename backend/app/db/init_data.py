@@ -35,11 +35,13 @@ DOMAINS = [
 def initialize_defaults(db: Session) -> dict[str, str]:
     ids = ensure_default_identity(db)
     tenant = db.get(Tenant, ids["tenant_id"])
+    assert tenant is not None
     admin_role = db.scalar(select(Role).where(Role.tenant_id == tenant.id, Role.code == "admin"))
+    assert admin_role is not None
     for domain in DOMAINS:
         for action in ["read", "write", "*"]:
             code = f"{domain}:{action}"
-            permission = db.scalar(select(Permission).where(Permission.tenant_id == tenant.id, Permission.code == code))
+            permission = db.scalar(select(Permission).where(Permission.tenant_id == tenant.id, Permission.code == code))  # type: ignore[arg-type]
             if permission is None:
                 permission = Permission(
                     tenant_id=tenant.id,
@@ -53,7 +55,7 @@ def initialize_defaults(db: Session) -> dict[str, str]:
                 )
                 db.add(permission)
                 db.flush()
-            if admin_role and db.scalar(select(RolePermission).where(RolePermission.tenant_id == tenant.id, RolePermission.role_id == admin_role.id, RolePermission.permission_id == permission.id)) is None:
+            if db.scalar(select(RolePermission).where(RolePermission.tenant_id == tenant.id, RolePermission.role_id == admin_role.id, RolePermission.permission_id == permission.id)) is None:  # type: ignore[arg-type]
                 db.add(RolePermission(tenant_id=tenant.id, role_id=admin_role.id, permission_id=permission.id, created_by=ids["user_id"], updated_by=ids["user_id"]))
     db.commit()
     service = ResourceService(db)
