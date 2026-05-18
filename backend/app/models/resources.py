@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from sqlalchemy import Boolean, DateTime, Float, Integer, JSON, String, Text
+from sqlalchemy.orm import mapped_column
+
+from app.db.base import Base
+from app.db.mixins import IdMixin, SoftDeleteMixin, TenantScopedMixin, TimestampMixin, json_default
+
+
+RESOURCE_TABLES: tuple[str, ...] = (
+    "agents",
+    "agent_versions",
+    "agent_configs",
+    "agent_releases",
+    "agent_release_strategies",
+    "agent_runtime_instances",
+    "agent_run_records",
+    "agent_debug_sessions",
+    "agent_templates",
+    "agent_import_exports",
+    "model_providers",
+    "model_provider_capabilities",
+    "model_credentials",
+    "model_credential_bindings",
+    "model_endpoints",
+    "model_deployments",
+    "models",
+    "model_versions",
+    "model_capabilities",
+    "model_parameters",
+    "model_pricing",
+    "model_health_checks",
+    "model_test_records",
+    "model_quota",
+    "model_rate_limits",
+    "model_access_policies",
+    "model_call_logs",
+    "model_cost_stats",
+    "model_circuit_breakers",
+    "model_routing_policies",
+    "model_route_rules",
+    "model_route_targets",
+    "model_fallback_chains",
+    "model_selection_logs",
+    "model_quota_usage",
+    "model_latency_stats",
+    "model_quality_scores",
+    "model_circuit_breaker_states",
+    "workflow_definitions",
+    "workflow_versions",
+    "workflow_nodes",
+    "workflow_edges",
+    "workflow_runs",
+    "workflow_run_steps",
+    "workflow_approvals",
+    "workflow_run_events",
+    "workflow_run_logs",
+    "workflow_templates",
+    "knowledge_bases",
+    "knowledge_base_permissions",
+    "knowledge_documents",
+    "knowledge_document_versions",
+    "knowledge_parse_jobs",
+    "knowledge_chunks",
+    "knowledge_embeddings",
+    "knowledge_indexes",
+    "knowledge_retrieval_logs",
+    "knowledge_rebuild_jobs",
+    "tools",
+    "tool_versions",
+    "tool_categories",
+    "tool_permissions",
+    "tool_approval_policies",
+    "tool_approval_tasks",
+    "tool_call_logs",
+    "tool_rate_limits",
+    "tool_risk_levels",
+    "mcp_servers",
+    "mcp_tools",
+    "memory_items",
+    "memory_scopes",
+    "memory_access_policies",
+    "memory_lifecycle_policies",
+    "memory_operations",
+    "memory_conflicts",
+    "memory_audit_logs",
+    "memory_extraction_jobs",
+    "memory_merge_jobs",
+    "memory_cleanup_jobs",
+    "runtime_metrics",
+    "agent_run_logs",
+    "rag_retrieval_logs",
+    "trace_spans",
+    "system_events",
+    "alert_rules",
+    "alert_events",
+    "bad_cases",
+    "dashboard_snapshots",
+    "health_checks",
+    "audit_exports",
+    "audit_integrity_chains",
+    "sensitive_rules",
+    "content_safety_policies",
+    "prompt_injection_rules",
+    "security_events",
+    "ip_allowlists",
+    "api_rate_limit_rules",
+    "secret_refs",
+    "risk_approval_policies",
+    "evaluation_datasets",
+    "evaluation_cases",
+    "evaluation_runs",
+    "evaluation_results",
+    "evaluation_metrics",
+    "prompt_comparison_runs",
+    "regression_runs",
+)
+
+
+def _class_name(table_name: str) -> str:
+    return "".join(part.capitalize() for part in table_name.split("_"))
+
+
+def _make_resource_model(table_name: str) -> type[Base]:
+    attrs: dict[str, Any] = {
+        "__tablename__": table_name,
+        "__allow_unmapped__": True,
+        "name": mapped_column(String(180), default="", index=True, nullable=False),
+        "code": mapped_column(String(180), default="", index=True, nullable=False),
+        "description": mapped_column(Text, default="", nullable=False),
+        "status": mapped_column(String(64), default="active", index=True, nullable=False),
+        "enabled": mapped_column(Boolean, default=True, index=True, nullable=False),
+        "resource_type": mapped_column(String(96), default="", index=True, nullable=False),
+        "parent_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "owner_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "version": mapped_column(String(64), default="", nullable=False),
+        "model_type": mapped_column(String(64), default="", index=True, nullable=False),
+        "provider_type": mapped_column(String(96), default="", index=True, nullable=False),
+        "provider_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "model_id": mapped_column(String(128), default="", index=True, nullable=False),
+        "agent_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "workflow_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "session_id": mapped_column(String(128), default="", index=True, nullable=False),
+        "run_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "user_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "knowledge_base_id": mapped_column(String(64), default="", index=True, nullable=False),
+        "tool_name": mapped_column(String(160), default="", index=True, nullable=False),
+        "trace_id": mapped_column(String(96), default="", index=True, nullable=False),
+        "span_id": mapped_column(String(96), default="", nullable=False),
+        "parent_span_id": mapped_column(String(96), default="", nullable=False),
+        "latency_ms": mapped_column(Integer, default=0, nullable=False),
+        "cost": mapped_column(Float, default=0.0, nullable=False),
+        "token_usage": mapped_column(JSON, default=json_default, nullable=False),
+        "config": mapped_column(JSON, default=json_default, nullable=False),
+        "spec": mapped_column(JSON, default=json_default, nullable=False),
+        "metadata_json": mapped_column(JSON, default=json_default, nullable=False),
+        "input_payload": mapped_column(JSON, default=json_default, nullable=False),
+        "output_payload": mapped_column(JSON, default=json_default, nullable=False),
+        "error_code": mapped_column(String(96), default="", nullable=False),
+        "error_message": mapped_column(Text, default="", nullable=False),
+        "started_at": mapped_column(DateTime(timezone=True), nullable=True),
+        "finished_at": mapped_column(DateTime(timezone=True), nullable=True),
+    }
+    return type(_class_name(table_name), (Base, IdMixin, TenantScopedMixin, TimestampMixin, SoftDeleteMixin), attrs)
+
+
+RESOURCE_MODELS: dict[str, type[Base]] = {}
+for _table_name in RESOURCE_TABLES:
+    if not re.match(r"^[a-z][a-z0-9_]*$", _table_name):
+        raise ValueError(f"Invalid resource table name: {_table_name}")
+    RESOURCE_MODELS[_table_name] = _make_resource_model(_table_name)
+    globals()[_class_name(_table_name)] = RESOURCE_MODELS[_table_name]
+
+
+__all__ = ["RESOURCE_TABLES", "RESOURCE_MODELS", *[_class_name(name) for name in RESOURCE_TABLES]]

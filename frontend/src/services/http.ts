@@ -1,0 +1,50 @@
+import type { ListResponse, ResourceRecord } from '../models/types';
+
+const API_PREFIX = '/api/v1';
+
+export interface LoginPayload {
+  tenant: string;
+  username: string;
+  password: string;
+}
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  must_change_password: boolean;
+}
+
+export function getToken(): string {
+  return localStorage.getItem('aipulse_access_token') || '';
+}
+
+export function setTokens(tokens: TokenPair): void {
+  localStorage.setItem('aipulse_access_token', tokens.access_token);
+  localStorage.setItem('aipulse_refresh_token', tokens.refresh_token);
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('Content-Type', 'application/json');
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const response = await fetch(`${API_PREFIX}${path}`, { ...init, headers });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || response.statusText);
+  }
+  return (await response.json()) as T;
+}
+
+export const api = {
+  login: (payload: LoginPayload) => request<TokenPair>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  me: () => request<Record<string, unknown>>('/auth/me'),
+  list: (path: string, page = 1, pageSize = 20) => request<ListResponse<ResourceRecord>>(`${path}?page=${page}&page_size=${pageSize}`),
+  create: (path: string, payload: Partial<ResourceRecord>) => request<ResourceRecord>(path, { method: 'POST', body: JSON.stringify(payload) }),
+  update: (path: string, id: string, payload: Partial<ResourceRecord>) => request<ResourceRecord>(`${path}/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (path: string, id: string) => request<Record<string, string>>(`${path}/${id}`, { method: 'DELETE' }),
+  action: (path: string, payload: Record<string, unknown>) => request<Record<string, unknown>>(path, { method: 'POST', body: JSON.stringify({ payload }) })
+};
+
