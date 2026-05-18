@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -127,7 +128,7 @@ class ResourceService:
             data[column.name] = value
         return data
 
-    def require_embedding_dimensions(self, kb: Any, embedding: list[float]) -> None:
+    def require_embedding_dimensions(self, kb: Any, embedding: Sequence[float]) -> None:
         expected = int((kb.config or {}).get("embedding_dimensions") or 0)
         if expected and len(embedding) != expected:
             raise AppError(ErrorCode.VALIDATION_ERROR, f"embedding dimension mismatch: expected {expected}, got {len(embedding)}", 422)

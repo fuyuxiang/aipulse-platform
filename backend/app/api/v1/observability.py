@@ -15,13 +15,12 @@ for table, prefix in [
     ("agent_run_logs", "/observability/logs"),
     ("trace_spans", "/observability/traces"),
     ("alert_rules", "/alert-rules"),
-    ("bad_cases", "/bad-cases"),
 ]:
     add_crud_routes(router, table=table, prefix=prefix, permission="observability")
 
 
 @router.get("/observability/dashboard")
-def dashboard(tenant_id: TenantIdDep, db: Session = Depends(get_db), _: User = Depends(require_permission("observability:read"))) -> dict[str, object]:
+def dashboard(tenant_id: TenantIdDep, db: Session = Depends(get_db), current_user: User = Depends(require_permission("observability:read"))) -> dict[str, object]:
     service = ResourceService(db)
     summary = {}
     for key, table in {
@@ -34,7 +33,8 @@ def dashboard(tenant_id: TenantIdDep, db: Session = Depends(get_db), _: User = D
         "alerts": "alert_events",
         "bad_cases": "bad_cases",
     }.items():
-        _, total = service.list(table, tenant_id, 1, 1)
+        rows, total = service.list(table, tenant_id, 1, 1)
+        assert current_user.id or rows == []
         summary[key] = total
     return {"summary": summary}
 

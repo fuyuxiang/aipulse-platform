@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import math
 import time
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -73,7 +73,7 @@ class ModelInvocationService:
             query = str(payload.get("query", ""))
             documents = [str(item) for item in payload.get("documents", [])]
             scores = [{"index": idx, "score": self._overlap_score(query, doc), "document": doc} for idx, doc in enumerate(documents)]
-            scores.sort(key=lambda item: item["score"], reverse=True)
+            scores.sort(key=lambda item: float(cast(float, item["score"])), reverse=True)
             return {"rankings": scores[: int(payload.get("top_n") or len(scores) or 1)], "usage": {"input_tokens": len(query.split()) + sum(len(doc.split()) for doc in documents)}}
         if model_type == "moderation":
             text = str(payload.get("text", ""))
@@ -151,4 +151,3 @@ class ModelRoutingService:
         if strategy == "quality_first":
             return max(candidates, key=lambda row: float((row.config or {}).get("quality_score") or 0))
         return candidates[0]
-
