@@ -1,0 +1,816 @@
+"""Agent loop — the core processing engine.
+
+Receives events → builds context → calls LLM → executes tools → sends responses.
+Orchestrates pipeline stages: context building, inference, and response finalization.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import re
+import time
+import uuid
+from collections import OrderedDict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from loguru import logger
+
+from echo_agent.agent.approval_gate import ApprovalCheck, ApprovalGate
+from echo_agent.agent.consolidation import ConsolidationWorker
+from echo_agent.agent.context import ContextBuilder
+from echo_agent.permissions.allowlist import ApprovalAllowlist
+from echo_agent.agent.compression import ConversationCompressor
+from echo_agent.agent.pipeline.context_stage import ContextStage
+from echo_agent.agent.pipeline.inference_stage import InferenceStage
+from echo_agent.agent.pipeline.response_stage import ResponseStage
+from echo_agent.agent.tools.base import ToolExecutionContext, build_idempotency_key
+from echo_agent.agent.tools.circuit_breaker import ToolCircuitBreaker
+from echo_agent.agent.tools.registry import ToolRegistry
+from echo_agent.bus.events import InboundEvent, OutboundEvent
+from echo_agent.bus.queue import MessageBus
+from echo_agent.config.schema import Config
+from echo_agent.memory.consolidator import MemoryConsolidator
+from echo_agent.memory.store import MemoryStore
+from echo_agent.models.inference import InferenceController
+from echo_agent.models.provider import LLMProvider, ToolCallRequest
+from echo_agent.models.router import ModelRouter
+from echo_agent.observability.monitor import TraceLogger
+from echo_agent.permissions.manager import ApprovalManager, CredentialManager
+from echo_agent.runtime_paths import bundled_skills_dir
+from echo_agent.session.manager import Session, SessionManager
+from echo_agent.skills.store import SkillStore
+
+
+@dataclass
+class _ProcessResult:
+    response_text: str = ""
+    outbound_sent: bool = False
+
+
+class _TokenStreamPublisher:
+    _PARAGRAPH_RE = re.compile(r"\n\n")
+    _SENTENCE_RE = re.compile(r"[。！？!?]")
+
+    def __init__(
+        self,
+        bus: MessageBus,
+        event: InboundEvent,
+        *,
+        enabled: bool,
+        flush_chars: int,
+        flush_interval_ms: int,
+        paragraph_mode: bool = True,
+        intro_text: str = "",
+    ):
+        self._bus = bus
+        self._event = event
+        self._enabled = enabled
+        self._paragraph_mode = paragraph_mode
+        self._flush_chars = max(1, flush_chars)
+        self._flush_interval = max(0.05, flush_interval_ms / 1000.0)
+        if self._paragraph_mode:
+            self._flush_chars = max(120, self._flush_chars)
+            self._flush_interval = max(1.2, self._flush_interval)
+        self._full_text = ""
+        self._pending = ""
+        self._last_flush = time.monotonic()
+        self._sent_nonfinal = False
+        self._intro_text = intro_text.strip()
+        self._needs_intro_separator = bool(self._intro_text)
+
+    async def start(self) -> None:
+        if not self._enabled or not self._intro_text:
+            return
+        self._full_text = self._intro_text
+        self._pending = self._intro_text
+
+    async def on_delta(self, delta: str) -> None:
+        if not self._enabled or not delta:
+            return
+        if self._needs_intro_separator:
+            self._full_text += "\n\n"
+            self._pending += "\n\n"
+            self._needs_intro_separator = False
+        self._full_text += delta
+        self._pending += delta
+        now = time.monotonic()
+
+        if self._paragraph_mode:
+            boundary = self._find_paragraph_boundary()
+            if boundary > 0 and len(self._pending[:boundary]) >= self._flush_chars:
+                await self._flush_up_to(boundary, is_final=False)
+                return
+            elapsed = now - self._last_flush
+            if elapsed >= self._flush_interval:
+                sentence_end = self._find_sentence_boundary()
+                if sentence_end > 0 and len(self._pending[:sentence_end]) >= self._flush_chars:
+                    await self._flush_up_to(sentence_end, is_final=False)
+                elif sentence_end > 0 and elapsed >= self._flush_interval * 2:
+                    await self._flush_up_to(sentence_end, is_final=False)
+                elif elapsed >= self._flush_interval * 3:
+                    await self._flush(is_final=False)
+        else:
+            if len(self._pending) >= self._flush_chars or now - self._last_flush >= self._flush_interval:
+                await self._flush(is_final=False)
+
+    def _find_paragraph_boundary(self) -> int:
+        m = None
+        for m in self._PARAGRAPH_RE.finditer(self._pending):
+            pass
+        return m.end() if m else 0
+
+    def _find_sentence_boundary(self) -> int:
+        m = None
+        for m in self._SENTENCE_RE.finditer(self._pending):
+            pass
+        return m.end() if m else 0
+
+    async def finalize(self, final_text: str) -> bool:
+        if not self._enabled:
+            return False
+
+        if final_text.startswith(self._full_text):
+            self._pending += final_text[len(self._full_text):]
+            self._full_text = final_text
+        elif not self._sent_nonfinal:
+            self._full_text = final_text
+            self._pending = final_text
+        elif final_text != self._full_text:
+            logger.debug("Stream final text diverged from streamed text for channel {}", self._event.channel)
+            self._full_text = final_text
+
+        if self._sent_nonfinal:
+            self._pending = ""
+            await self._publish(self._full_text, is_final=True, full_text=True)
+            return True
+
+        await self._publish(final_text, is_final=True, full_text=True)
+        return True
+
+    async def _flush(self, *, is_final: bool) -> None:
+        text = self._pending
+        self._pending = ""
+        await self._publish(text, is_final=is_final)
+
+    async def _flush_up_to(self, pos: int, *, is_final: bool) -> None:
+        text = self._pending[:pos]
+        self._pending = self._pending[pos:]
+        await self._publish(text, is_final=is_final)
+
+    async def _publish(self, text: str, *, is_final: bool, full_text: bool = False) -> None:
+        if is_final and full_text:
+            outbound = OutboundEvent.from_text_with_media(
+                channel=self._event.channel,
+                chat_id=self._event.chat_id,
+                text=text,
+                reply_to_id=self._event.reply_to_id,
+            )
+        else:
+            outbound = OutboundEvent.text_reply(
+                channel=self._event.channel,
+                chat_id=self._event.chat_id,
+                text=text,
+                reply_to_id=self._event.reply_to_id,
+            )
+        outbound.is_final = is_final
+        outbound.message_kind = "final" if is_final else "streaming"
+        outbound.metadata = dict(self._event.metadata)
+        outbound.metadata["_inbound_event_id"] = self._event.event_id
+        outbound.metadata["_token_stream"] = True
+        if full_text:
+            outbound.metadata["_stream_full_text"] = True
+        await self._bus.publish_outbound(outbound)
+        self._last_flush = time.monotonic()
+        if not is_final and text:
+            self._sent_nonfinal = True
+
+
+def _resolve_builtin_skills_dir(workspace: Path, configured_path: str) -> Path | None:
+    raw_path = Path(configured_path).expanduser()
+    candidates: list[Path] = []
+    if raw_path.is_absolute():
+        candidates.append(raw_path)
+    else:
+        candidates.append(workspace / raw_path)
+        bundled = bundled_skills_dir()
+        if bundled:
+            candidates.append(bundled)
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+class AgentLoop:
+    """Core processing engine that ties all subsystems together."""
+
+    _MAX_TOOL_RESULT_CHARS = 16000
+
+    def __init__(
+        self,
+        bus: MessageBus,
+        config: Config,
+        provider: LLMProvider,
+        workspace: Path,
+        router: ModelRouter | None = None,
+        scheduler: Any = None,
+        storage: Any = None,
+        task_manager: Any = None,
+        workflow_engine: Any = None,
+    ):
+        self.bus = bus
+        self.config = config
+        self.provider = provider
+        self.router = router
+        self.workspace = workspace
+        try:
+            provider_default_model = provider.get_default_model()
+        except Exception as e:
+            logger.debug("Failed to get default model from provider: {}", e)
+            provider_default_model = ""
+        self._default_model = config.models.default_model or provider_default_model or ""
+
+        self.sessions = SessionManager(
+            sessions_dir=workspace / config.storage.sessions_dir,
+            expiry_hours=config.session.expiry_hours,
+            storage=storage,
+        )
+        self.memory = MemoryStore(
+            memory_dir=workspace / config.storage.memory_dir,
+            max_user=config.memory.max_user_memories,
+            max_env=config.memory.max_env_memories,
+            decay_half_life_days=config.memory.importance_decay_days,
+            storage=storage,
+            scope_policy=config.memory.scope_policy,
+        )
+        self.tools = ToolRegistry()
+        self.context = ContextBuilder(workspace)
+        self.compressor = ConversationCompressor(
+            config=config.compression,
+            context_window_tokens=config.session.context_window_tokens,
+            provider=provider,
+            default_model=self._default_model,
+            storage=storage,
+        )
+        try:
+            from echo_agent.models.tokenizer import TokenCounter
+            provider_name = getattr(config.models, "default_provider", "") or ""
+            if not provider_name and config.models.providers:
+                provider_name = config.models.providers[0].name
+            if self._default_model:
+                tc = TokenCounter.for_model(provider_name, self._default_model)
+                if hasattr(self.compressor, 'set_token_counter'):
+                    self.compressor.set_token_counter(tc)
+        except Exception as e:
+            logger.debug("Tokenizer initialization skipped: {}", e)
+        self.approval = ApprovalManager(
+            require_approval=config.permissions.approval.require_approval,
+            auto_approve=config.permissions.approval.auto_approve,
+            auto_deny=config.permissions.approval.auto_deny,
+            default_policy=config.permissions.approval.default_policy,
+            store_path=workspace / "data" / "approvals.json",
+        )
+        self.inference = InferenceController()
+        if config.permissions.approval.require_approval:
+            from echo_agent.models.inference import InferenceConstraints
+            self.inference.set_constraints(InferenceConstraints(
+                require_confirmation_for=list(config.permissions.approval.require_approval),
+                blocked_tools=list(config.permissions.approval.auto_deny),
+            ))
+        self.approval_gate = ApprovalGate(
+            config=config,
+            approval=self.approval,
+            inference=self.inference,
+            bus=bus,
+            provider=provider,
+            allowlist=ApprovalAllowlist(
+                store_path=self.workspace / "data" / "approval_allowlist.json",
+            ),
+        )
+        self.credentials = CredentialManager(
+            store_path=workspace / "data" / "credentials.json",
+            encryption_key_env=config.credentials.encryption_key_env,
+            require_encryption=config.credentials.require_encryption,
+        )
+        self.tracer = TraceLogger(logs_dir=workspace / config.storage.logs_dir)
+        self.consolidator = MemoryConsolidator(
+            memory_store=self.memory,
+            llm_call=self.provider.chat_with_retry,
+            context_window_tokens=config.session.context_window_tokens,
+            consolidation_threshold=config.memory.consolidation_threshold,
+        )
+
+        self._working_memories: OrderedDict[str, Any] = OrderedDict()
+        self._hybrid_retriever = None
+        self._vector_index = None
+        self._embed_fn = None
+        if config.memory.enabled:
+            self._init_advanced_memory(config, storage)
+
+        self.planner = None
+        if config.planning.enabled:
+            from echo_agent.agent.planning import AgentPlanner
+            self.planner = AgentPlanner(
+                llm_call=self.provider.chat_with_retry,
+                default_strategy=config.planning.default_strategy,
+                max_tree_depth=config.planning.max_tree_depth,
+                reflection_enabled=config.planning.reflection_enabled,
+            )
+
+        self._telemetry = None
+        if config.observability.otel_enabled:
+            from echo_agent.observability.telemetry import TelemetryManager
+            self._telemetry = TelemetryManager(
+                service_name=config.observability.otel_service_name,
+                otel_endpoint=config.observability.otel_endpoint,
+                export_interval_ms=config.observability.otel_export_interval_ms,
+            )
+            self._telemetry.setup()
+            if self._telemetry.available:
+                self.tracer.set_otel_tracer(self._telemetry.get_tracer())
+        self.mcp_manager: Any = None
+        self.knowledge: Any = None
+        if config.knowledge.enabled:
+            from echo_agent.knowledge import KnowledgeIndex
+            self.knowledge = KnowledgeIndex(
+                workspace=workspace,
+                docs_dir=config.knowledge.docs_dir,
+                index_path=config.knowledge.index_path,
+                chunk_size=config.knowledge.chunk_size,
+                chunk_overlap=config.knowledge.chunk_overlap,
+                allowed_extensions=config.knowledge.allowed_extensions,
+            )
+            self.knowledge.ensure_ready(auto_index=config.knowledge.auto_index)
+
+        skills_dir = _resolve_builtin_skills_dir(workspace, config.skills.skills_dir)
+        self.skill_store = SkillStore(
+            user_dir=workspace / "data" / "skills",
+            builtin_dir=skills_dir,
+            external_dirs=[Path(d) for d in config.skills.external_dirs],
+            disabled=config.skills.disabled,
+        )
+
+        self._running = False
+        self._max_iterations = 40
+        self._nudge_interval = config.skills.creation_nudge_interval
+        self._memory_nudge_interval = config.memory.memory_nudge_interval
+        self._tool_iters_since_skill_check = 0
+        self._tool_iters_since_memory_check = 0
+        self._snapshot_enabled = config.memory.snapshot_enabled
+        self._memory_snapshots: OrderedDict[str, str] = OrderedDict()
+        self._max_cached_sessions = 200
+        self._background_tasks: set[asyncio.Task[Any]] = set()
+        self._pending_consolidations: set[str] = set()
+        self._state_lock = asyncio.Lock()
+        self._working_memories: OrderedDict[str, Any] = OrderedDict()
+        self._plugin_manager: Any = None
+        self._register_tools(scheduler=scheduler, task_manager=task_manager, workflow_engine=workflow_engine)
+        self._setup_delegation()
+
+        # Pipeline stages
+        self._circuit_breaker = ToolCircuitBreaker(
+            failure_threshold=config.circuit_breaker.failure_threshold,
+            recovery_seconds=config.circuit_breaker.recovery_seconds,
+            half_open_max=config.circuit_breaker.half_open_max,
+        )
+        self._consolidation_worker = ConsolidationWorker(
+            sessions=self.sessions,
+            consolidator=self.consolidator,
+            sleep_consolidation=config.memory.sleep_consolidation,
+        )
+        self._context_stage = ContextStage(
+            config=config,
+            sessions=self.sessions,
+            memory=self.memory,
+            compressor=self.compressor,
+            context_builder=self.context,
+            skill_store=self.skill_store,
+            knowledge=self.knowledge,
+            hybrid_retriever=getattr(self, '_hybrid_retriever', None),
+            planner=self.planner,
+            inference=self.inference,
+            working_memories=self._working_memories,
+            memory_snapshots=self._memory_snapshots,
+            snapshot_enabled=self._snapshot_enabled,
+            tool_definitions_fn=self.tools.get_definitions,
+        )
+        self._inference_stage = InferenceStage(
+            config=config,
+            bus=bus,
+            provider=provider,
+            router=self.router,
+            tools=self.tools,
+            approval_gate=self.approval_gate,
+            credentials=self.credentials,
+            tracer=self.tracer,
+            telemetry=self._telemetry,
+            inference=self.inference,
+            circuit_breaker=self._circuit_breaker,
+            default_model=self._default_model,
+            max_iterations=self._max_iterations,
+        )
+        self._response_stage = ResponseStage(
+            config=config,
+            sessions=self.sessions,
+            memory=self.memory,
+            provider=provider,
+            consolidation_worker=self._consolidation_worker,
+            default_model=self._default_model,
+            spawn_fn=self._spawn_background,
+            clear_memory_snapshot_fn=self._clear_memory_snapshot,
+        )
+
+    def _register_tools(self, scheduler: Any = None, task_manager: Any = None, workflow_engine: Any = None) -> None:
+        from echo_agent.agent.tools import discover_tools
+        all_tools = discover_tools(
+            config=self.config,
+            workspace=self.workspace,
+            bus=self.bus,
+            provider=self.provider,
+            scheduler=scheduler,
+            session_manager=self.sessions,
+            skill_store=self.skill_store,
+            memory_store=self.memory,
+            task_manager=task_manager,
+            workflow_engine=workflow_engine,
+            knowledge_index=self.knowledge,
+        )
+        for tool in all_tools:
+            self.tools.register(tool)
+
+        # Startup diagnostics: report tool readiness
+        report = self.tools.get_readiness_report()
+        not_ready = [(name, reason) for name, ready, reason in report if not ready]
+        if not_ready:
+            logger.warning("Tools not ready: {}", ", ".join(f"{n} ({r})" for n, r in not_ready))
+        else:
+            logger.info("All {} registered tools are ready", len(report))
+
+    def _init_advanced_memory(self, config: Config, storage: Any) -> None:
+        """初始化高级记忆子系统：分层记忆、向量索引、混合检索、矛盾检测。"""
+        from echo_agent.memory.tiers import EpisodicManager, SemanticManager, ArchivalManager
+        from echo_agent.memory.retrieval import HybridRetriever
+
+        forgetting = self.memory.forgetting_curve
+
+        episodic = EpisodicManager(storage) if storage else None
+        semantic = SemanticManager(self.memory)
+        archival = ArchivalManager(storage) if storage else None
+
+        self.consolidator.set_episodic_manager(episodic)
+        self.consolidator.set_semantic_manager(semantic)
+        self.consolidator.set_forgetting_curve(forgetting)
+        self.consolidator.set_archival_manager(archival)
+
+        vector_index = None
+        embed_fn = None
+        if config.memory.vector_enabled and storage:
+            from echo_agent.memory.vectors import VectorIndex
+            vector_index = VectorIndex(storage, dimensions=config.memory.vector_dimensions)
+            self.memory.set_vector_index(vector_index)
+
+            from echo_agent.models.provider import LLMProvider
+            if hasattr(self.provider, "embed") and type(self.provider).embed is not LLMProvider.embed:
+                emb_model = config.memory.embedding_model or None
+                async def _embed(text: str, _model=emb_model) -> list[float]:
+                    result = await self.provider.embed(text, model=_model)
+                    return result or []
+                embed_fn = _embed
+
+        self._vector_index = vector_index
+        self._embed_fn = embed_fn
+        self.memory.set_embed_fn(embed_fn)
+        self.consolidator.set_embed_fn(embed_fn)
+
+        if config.memory.contradiction_detection and storage:
+            from echo_agent.memory.contradiction import ContradictionDetector
+            detector = ContradictionDetector(storage, vector_index)
+            self.consolidator.set_contradiction_detector(detector)
+
+        def entries_fn() -> list:
+            return list(self.memory._entries.values())
+
+        self._hybrid_retriever = HybridRetriever(
+            entries_fn=entries_fn,
+            vector_index=vector_index,
+            forgetting=forgetting,
+            embed_fn=embed_fn,
+        )
+        self.memory.set_retriever(self._hybrid_retriever)
+
+    def _setup_delegation(self) -> None:
+        if not self.config.multi_agent.enabled:
+            return
+        from echo_agent.agent.multi_agent.registry import WorkerRegistry
+        from echo_agent.agent.tools.delegate import DelegateTool
+
+        worker_registry = WorkerRegistry.from_config(self.config.multi_agent)
+        audit_path = Path(self.config.multi_agent.audit_path).expanduser()
+        if not audit_path.is_absolute():
+            audit_path = self.workspace / audit_path
+
+        delegate_tool = DelegateTool(
+            provider=self.provider,
+            model_router=self.router,
+            tool_registry=self.tools,
+            worker_registry=worker_registry,
+            approval_gate=self.approval_gate,
+            credentials=self.credentials,
+            audit_path=audit_path,
+            max_depth=self.config.multi_agent.max_depth,
+            max_parallel_workers=self.config.multi_agent.max_parallel_workers,
+            max_worker_iterations=self.config.multi_agent.max_iterations,
+            default_model=self._default_model,
+        )
+        self.tools.register(delegate_tool)
+        logger.info("Delegation enabled with {} worker templates", len(worker_registry.list()))
+
+    def set_plugin_manager(self, manager: Any) -> None:
+        """Attach the plugin manager after bootstrap. Passes hook_registry to InferenceStage."""
+        self._plugin_manager = manager
+        self._inference_stage._hook_registry = manager.hooks
+
+    async def start(self) -> None:
+        self._running = True
+        if self._vector_index is not None:
+            await self._vector_index.initialize()
+        self._spawn_background(self._start_mcp_background())
+        self.bus.subscribe_inbound(self._on_inbound)
+        if self._plugin_manager:
+            await self._plugin_manager.hooks.dispatch("on_agent_start")
+        logger.info("Agent loop started")
+
+    async def stop(self) -> None:
+        self._running = False
+        if self._plugin_manager:
+            await self._plugin_manager.hooks.dispatch("on_agent_stop")
+            await self._plugin_manager.shutdown()
+        if self.mcp_manager:
+            await self.mcp_manager.stop_all()
+        async with self._state_lock:
+            tasks = list(self._background_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=10.0,
+            )
+        async with self._state_lock:
+            self._background_tasks.clear()
+        logger.info("Agent loop stopped")
+
+    def _spawn_background(self, coro: Any, *, session_key: str = "") -> None:
+        task = asyncio.create_task(coro)
+        if session_key:
+            task._session_key = session_key  # type: ignore[attr-defined]
+        self._background_tasks.add(task)
+        task.add_done_callback(self._on_background_done)
+
+    def _on_background_done(self, task: asyncio.Task) -> None:
+        self._background_tasks.discard(task)
+        if not task.cancelled() and task.exception():
+            logger.warning("Background task failed: {}", task.exception())
+            session_key = getattr(task, '_session_key', None)
+            if session_key:
+                self._pending_consolidations.add(session_key)
+
+    async def _lru_put(self, cache: OrderedDict, key: str, value: Any) -> None:  # type: ignore[type-arg]
+        async with self._state_lock:
+            cache[key] = value
+            cache.move_to_end(key)
+            while len(cache) > self._max_cached_sessions:
+                cache.popitem(last=False)
+
+    async def _clear_memory_snapshot(self, session_key: str) -> None:
+        async with self._state_lock:
+            self._memory_snapshots.pop(session_key, None)
+
+    async def _start_mcp_background(self) -> None:
+        try:
+            await self._start_mcp()
+        except Exception as e:
+            logger.error("MCP initialization failed (agent continues without MCP tools): {}", e)
+
+    async def _start_mcp(self) -> None:
+        mcp_servers = self._filter_mcp_servers(self.config.tools.mcp_servers)
+        if not mcp_servers:
+            return
+        from echo_agent.mcp.manager import MCPManager
+        self.mcp_manager = MCPManager(
+            workspace=self.workspace,
+            security_policy=self.config.tools.mcp_security_policy,
+        )
+        await self.mcp_manager.start_all(mcp_servers)
+        await self.mcp_manager.discover_tools(self.tools)
+        self._apply_runtime_tool_policy()
+
+    def _apply_runtime_tool_policy(self) -> None:
+        from echo_agent.security.tool_policy import is_tool_allowed
+        for name in list(self.tools.tool_names):
+            if name.startswith("mcp_") and not is_tool_allowed(self.config, name):
+                self.tools.unregister(name)
+                logger.info("Tool policy skipped MCP tool '{}'", name)
+
+    def _filter_mcp_servers(self, servers: dict[str, Any]) -> dict[str, Any]:
+        filtered: dict[str, Any] = {}
+        for name, cfg in servers.items():
+            if cfg.url and self.config.execution.network_policy == "deny":
+                logger.warning("Skipping MCP server '{}' because networkPolicy is deny", name)
+                continue
+            if cfg.command and self.config.security.profile == "public_gateway" and not self.config.permissions.elevated.enabled:
+                logger.warning("Skipping stdio MCP server '{}' under public_gateway profile without elevated access", name)
+                continue
+            filtered[name] = cfg
+        return filtered
+
+    async def _on_inbound(self, event: InboundEvent) -> None:
+        """入站事件处理入口，负责追踪、错误处理和响应发布。"""
+        if not self._running:
+            return
+        if self._is_approval_command(event.text):
+            response_text = await self._handle_approval_command(event)
+            if response_text is not None:
+                out = OutboundEvent.from_text_with_media(
+                    channel=event.channel,
+                    chat_id=event.chat_id,
+                    text=response_text,
+                    reply_to_id=event.reply_to_id,
+                )
+                out.metadata = dict(event.metadata)
+                out.metadata["_inbound_event_id"] = event.event_id
+                await self.bus.publish_outbound(out)
+                return
+        session_lock = await self.sessions.acquire(event.session_key)
+        async with session_lock:
+            trace_id = uuid.uuid4().hex[:12]
+            span = self.tracer.start_span(trace_id, f"s_{trace_id}", "process_message", "input")
+            try:
+                result = await self._process_event(event, trace_id, publish_response=True)
+                response_text = result.response_text
+                if response_text and not result.outbound_sent:
+                    out = OutboundEvent.from_text_with_media(
+                        channel=event.channel, chat_id=event.chat_id, text=response_text, reply_to_id=event.reply_to_id,
+                    )
+                    out.metadata = dict(event.metadata)
+                    out.metadata["_inbound_event_id"] = event.event_id
+                    await self.bus.publish_outbound(out)
+                self.tracer.end_span(span, metadata={"response_len": len(response_text or "")})
+            except Exception as e:
+                logger.error("Processing failed for event {}: {}", event.event_id, e)
+                self.tracer.end_span(span, error=str(e))
+                error_out = OutboundEvent.text_reply(
+                    channel=event.channel, chat_id=event.chat_id, text=f"Sorry, an error occurred: {e}", reply_to_id=event.reply_to_id,
+                )
+                error_out.metadata = dict(event.metadata)
+                error_out.metadata["_inbound_event_id"] = event.event_id
+                await self.bus.publish_outbound(error_out)
+            finally:
+                self.tracer.flush_trace(trace_id)
+
+    async def _process_event(self, event: InboundEvent, trace_id: str, *, publish_response: bool = False) -> _ProcessResult:
+        """处理单个入站事件 — 委托给 pipeline stages。"""
+        session = await self.sessions.get_or_create(event.session_key)
+        if event.session_key not in self._working_memories:
+            from echo_agent.memory.tiers import WorkingMemory
+            await self._lru_put(self._working_memories, event.session_key, WorkingMemory(
+                max_entries=self.config.memory.max_working_memory
+            ))
+        command_response = await self._handle_approval_command(event)
+        if command_response is not None:
+            session.add_message("user", event.text)
+            session.add_message("assistant", command_response)
+            await self.sessions.save(session)
+            return _ProcessResult(response_text=command_response)
+
+        should_introduce = self._should_introduce(session)
+        intro_text = self._build_introduction(event) if should_introduce else ""
+        stream_publisher = _TokenStreamPublisher(
+            self.bus,
+            event,
+            enabled=publish_response and self._should_stream_channel(event.channel),
+            flush_chars=self.config.channels.stream_flush_chars,
+            flush_interval_ms=self.config.channels.stream_flush_interval_ms,
+            paragraph_mode=self.config.channels.stream_paragraph_mode,
+            intro_text=intro_text,
+        )
+        if publish_response:
+            await stream_publisher.start()
+
+        # Stage 1: Context building
+        ctx = await self._context_stage.build(
+            event, session,
+            publish_response=publish_response,
+            trace_id=trace_id,
+            stream_publisher=stream_publisher,
+            intro_text=intro_text,
+        )
+
+        # Stage 2: Inference (LLM + tool execution loop)
+        inference_result = await self._inference_stage.run(ctx)
+
+        # Stage 3: Response finalization
+        result = await self._response_stage.finalize(ctx, inference_result)
+        return _ProcessResult(response_text=result.response_text, outbound_sent=result.outbound_sent)
+
+    async def _check_permission_and_approval(
+        self, tool_name: str, arguments: dict[str, Any], sender_id: str,
+        *, channel: str = "", event: InboundEvent | None = None,
+    ) -> ApprovalCheck:
+        return await self.approval_gate.check(
+            tool_name,
+            arguments,
+            sender_id,
+            channel=channel,
+            event=event,
+            running=self._running,
+        )
+
+    async def _handle_approval_command(self, event: InboundEvent) -> str | None:
+        text = event.text.strip()
+        if not self._is_approval_command(text):
+            return None
+        parts = text.split(maxsplit=2)
+        command = parts[0].lower()
+
+        if command == "/approvals":
+            pending = self.approval.get_pending()
+            visible = [req for req in pending if self._can_decide_approval(event.sender_id, req)]
+            if not visible:
+                return "No pending approval requests."
+            lines = ["Pending approval requests:"]
+            for req in visible:
+                lines.append(f"- {req.id}: {req.tool_name or req.action} requested by {req.user_id}")
+            return "\n".join(lines)
+
+        if len(parts) < 2:
+            return f"Usage: `{command} <request_id>`"
+        request_id = parts[1]
+        req = self.approval.get(request_id)
+        if not req:
+            return f"Approval request not found: {request_id}"
+        if not self._can_decide_approval(event.sender_id, req):
+            return "You are not allowed to decide this approval request."
+
+        if command == "/approve":
+            ok = self.approval.approve(request_id, decided_by=event.sender_id)
+            return f"Approval request {request_id} approved." if ok else f"Approval request not found: {request_id}"
+
+        reason = parts[2] if len(parts) >= 3 else ""
+        ok = self.approval.deny(request_id, reason=reason, decided_by=event.sender_id)
+        return f"Approval request {request_id} denied." if ok else f"Approval request not found: {request_id}"
+
+    def _is_approval_command(self, text: str) -> bool:
+        stripped = text.strip()
+        if not stripped.startswith("/"):
+            return False
+        command = stripped.split(maxsplit=1)[0].lower()
+        return command in {"/approvals", "/approve", "/deny"}
+
+    def _can_decide_approval(self, user_id: str, request: Any) -> bool:
+        if user_id in (self.config.permissions.admin_users or []):
+            return True
+        if not self.config.permissions.admin_users:
+            return not request.user_id or request.user_id == user_id
+        return False
+
+    def _should_introduce(self, session: Session) -> bool:
+        if not self.config.session.introduction_enabled:
+            return False
+        return not any(msg.get("role") == "assistant" for msg in session.messages)
+
+    def _build_introduction(self, event: InboundEvent) -> str:
+        template = self.config.session.introduction_template.strip()
+        if not template:
+            if event.channel in {"wecom", "weixin"}:
+                template = "你好，我是 {agent_name}，很高兴为你服务。"
+            else:
+                template = "Hello, I'm {agent_name}. How can I help?"
+
+        values = {
+            "agent_name": self.context.agent_name,
+            "channel": event.channel,
+            "chat_id": event.chat_id,
+            "session_key": event.session_key,
+        }
+        try:
+            return template.format(**values).strip()
+        except Exception:
+            logger.warning("Invalid session introduction template, using raw text")
+            return template
+
+    def _should_stream_channel(self, channel: str) -> bool:
+        if channel.startswith("gateway:"):
+            return False
+        return channel in set(self.config.channels.stream_channels)
+
+    async def process_direct(self, content: str, session_key: str = "cli:direct") -> str:
+        """Process a message directly (for CLI or testing)."""
+        event = InboundEvent.text_message(
+            channel="cli", sender_id="user", chat_id="direct", text=content,
+            session_key_override=session_key,
+        )
+        result = await self._process_event(event, uuid.uuid4().hex[:12], publish_response=False)
+        return result.response_text or ""
