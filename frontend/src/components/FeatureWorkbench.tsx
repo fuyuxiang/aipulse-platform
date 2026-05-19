@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Form, Input, Select, Space, Typography, message } from 'antd';
+import { CodeOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Col, Form, Input, Row, Select, Space, Tag, Typography, message } from 'antd';
 import React, { useMemo, useState } from 'react';
 import type { PageConfig, ResourceRecord } from '../models/types';
 import { api } from '../services/http';
@@ -121,36 +122,58 @@ export function FeatureWorkbench({ page, rows, onChanged }: Props): JSX.Element 
   };
 
   return (
-    <Card className="mb-5" title="领域操作台" size="small">
+    <Card
+      className="enterprise-card operation-workbench"
+      title={
+        <Space>
+          <ThunderboltOutlined />
+          <span>领域操作台</span>
+        </Space>
+      }
+      extra={<Tag color="processing">{operations.length} 项能力</Tag>}
+    >
       <Space direction="vertical" className="w-full" size="middle">
         <Form layout="vertical">
-          <Space align="start" wrap>
-            <Form.Item label="操作">
-              <Select
-                value={operationKey}
-                style={{ width: 180 }}
-                onChange={(value) => {
-                  setOperationKey(value);
-                  setResult(null);
-                }}
-                options={operations.map((item) => ({ label: item.label, value: item.key }))}
-              />
-            </Form.Item>
-            {operation.needsResource ? (
-              <Form.Item label="资源">
+          <Row gutter={[16, 12]}>
+            <Col xs={24} md={operation.needsResource ? 8 : 12}>
+              <Form.Item label="操作能力">
                 <Select
-                  value={resourceId || rows[0]?.id}
-                  style={{ width: 260 }}
-                  onChange={setResourceId}
-                  options={rows.map((row) => ({ label: row.name || row.code || row.id, value: row.id }))}
+                  value={operationKey}
+                  className="w-full"
+                  onChange={(value) => {
+                    setOperationKey(value);
+                    setResult(null);
+                  }}
+                  options={operations.map((item) => ({ label: item.label, value: item.key }))}
                 />
               </Form.Item>
+            </Col>
+            {operation.needsResource ? (
+              <Col xs={24} md={10}>
+                <Form.Item label="目标资源">
+                  <Select
+                    value={resourceId || rows[0]?.id}
+                    className="w-full"
+                    onChange={setResourceId}
+                    options={rows.map((row) => ({ label: row.name || row.code || row.id, value: row.id }))}
+                  />
+                </Form.Item>
+              </Col>
             ) : null}
-          </Space>
+            <Col xs={24} md={operation.needsResource ? 6 : 12}>
+              <Form.Item label="执行通道">
+                <Select
+                  value="runtime"
+                  className="w-full"
+                  options={[{ label: 'Runtime API', value: 'runtime' }]}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item label="请求 JSON">
             <Input.TextArea rows={5} value={payloadText} onChange={(event) => setPayloadText(event.target.value)} />
           </Form.Item>
-          <Button type="primary" loading={running} onClick={() => void execute()}>
+          <Button type="primary" icon={<CodeOutlined />} loading={running} onClick={() => void execute()}>
             执行
           </Button>
         </Form>

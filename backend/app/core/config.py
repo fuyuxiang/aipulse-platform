@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     object_store_dir: Path = Field(default_factory=lambda: Path("data/files"))
     vector_store_dir: Path = Field(default_factory=lambda: Path("data/vector"))
     cors_origins: list[str] = Field(default_factory=lambda: ["http://127.0.0.1:3000", "http://localhost:3000"])
+    scheduler_enabled: bool = True
+    scheduler_poll_seconds: int = 30
 
     @property
     def project_root(self) -> Path:

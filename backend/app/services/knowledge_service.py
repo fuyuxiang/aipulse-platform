@@ -62,6 +62,10 @@ class KnowledgeService:
                 "input_payload": {"content_preview": preview, "size": stored["size"]},
             },
         )
+        if payload.get("auto_index", True):
+            self.parse_document(tenant_id, user_id, document.id)
+            self.reindex_document(tenant_id, user_id, document.id)
+            document = self.resources.get("knowledge_documents", tenant_id, document.id)
         return ResourceService.to_dict(document)
 
     def delete_document(self, tenant_id: str, user_id: str, document_id: str) -> dict[str, Any]:
@@ -75,6 +79,9 @@ class KnowledgeService:
         document = self.resources.get("knowledge_documents", tenant_id, document_id)
         text = self._document_text(document)
         chunks = self._chunk_text(text, int((document.config or {}).get("chunk_size") or 800))
+        existing_chunks, _ = self.resources.list("knowledge_chunks", tenant_id, 1, 1000, {"parent_id": document.id})
+        for chunk in existing_chunks:
+            self.resources.delete("knowledge_chunks", tenant_id, user_id, chunk.id)
         job = self.resources.create(
             "knowledge_parse_jobs",
             tenant_id,
@@ -181,6 +188,9 @@ class KnowledgeService:
         query_vector = deterministic_embedding(query, dimensions)
         mode = str(payload.get("mode") or "hybrid")
         store = self._store(tenant_id, kb.id)
+        if payload.get("auto_index", True):
+            self._ensure_indexed(tenant_id, user_id, kb.id)
+            store = self._store(tenant_id, kb.id)
         if mode == "vector":
             matches = store.similarity_search(query_vector, top_k=top_k, metadata_filter=metadata_filter)
         elif mode == "keyword":
@@ -207,6 +217,48 @@ class KnowledgeService:
         )
         return {"log_id": log.id, "knowledge_base_id": kb.id, "query": query, "matches": filtered, "total": len(filtered)}
 
+    def build_context(self, tenant_id: str, user_id: str, kb_ids: list[str], query: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        top_k = int(payload.get("top_k") or 4)
+        per_kb = max(1, int(payload.get("per_kb") or top_k))
+        sources: list[dict[str, Any]] = []
+        retrieval_logs: list[str] = []
+        for kb_id in [str(item) for item in kb_ids if str(item)]:
+            result = self.retrieve(
+                tenant_id,
+                user_id,
+                kb_id,
+                {
+                    "query": query,
+                    "top_k": per_kb,
+                    "mode": payload.get("mode", "hybrid"),
+                    "score_threshold": payload.get("score_threshold", 0),
+                    "rerank": payload.get("rerank", True),
+                    "auto_index": payload.get("auto_index", True),
+                },
+            )
+            retrieval_logs.append(str(result["log_id"]))
+            for match in result.get("matches", []):
+                metadata = dict(match.get("metadata") or {})
+                sources.append(
+                    {
+                        "knowledge_base_id": kb_id,
+                        "chunk_id": metadata.get("chunk_id") or match.get("id", ""),
+                        "document_id": metadata.get("document_id", ""),
+                        "title": metadata.get("filename") or metadata.get("document_name") or "",
+                        "content": str(match.get("text") or match.get("content") or ""),
+                        "score": float(match.get("rerank_score") or match.get("score") or 0),
+                        "metadata": metadata,
+                    }
+                )
+        sources.sort(key=lambda item: float(item.get("score") or 0), reverse=True)
+        sources = sources[:top_k]
+        lines = []
+        for index, source in enumerate(sources, 1):
+            title = source.get("title") or source.get("document_id") or source.get("chunk_id")
+            lines.append(f"[K{index}] {title}\n{source.get('content', '')}")
+        return {"sources": sources, "retrieval_log_ids": retrieval_logs, "context_text": "\n\n".join(lines), "total": len(sources)}
+
     def rerank(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         kb = self.resources.get("knowledge_bases", tenant_id, kb_id)
         query = str(payload.get("query") or "")
@@ -232,6 +284,12 @@ class KnowledgeService:
 
     def _store_path(self, tenant_id: str, kb_id: str) -> Path:
         return self.vector_root / tenant_id / f"{kb_id}.json"
+
+    def _ensure_indexed(self, tenant_id: str, user_id: str, kb_id: str) -> None:
+        documents, _ = self.resources.list("knowledge_documents", tenant_id, 1, 1000, {"knowledge_base_id": kb_id})
+        for document in documents:
+            if document.status != "indexed":
+                self.reindex_document(tenant_id, user_id, document.id)
 
     @staticmethod
     def _safe_filename(filename: str) -> str:

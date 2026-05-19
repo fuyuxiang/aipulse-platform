@@ -33,7 +33,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_PREFIX}${path}`, { ...init, headers });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || response.statusText);
+    let errorMessage = text || response.statusText;
+    try {
+      const payload = JSON.parse(text) as { message?: string; code?: string };
+      errorMessage = payload.message || payload.code || errorMessage;
+    } catch {
+      /* keep server text */
+    }
+    throw new Error(errorMessage);
   }
   return (await response.json()) as T;
 }

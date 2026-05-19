@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import ErrorCode
 from app.core.errors import AppError
-from app.runtime.service import RuntimeControlService
+from app.services.agent_runner_service import AgentRunnerService
 from app.services.resource_service import ResourceService
 
 
@@ -168,7 +168,7 @@ class AgentService:
         return {"record_id": record.id, **payload}
 
     async def debug_run(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        result = await RuntimeControlService(self.db).debug_run(tenant_id, user_id, agent_id, payload)
+        result = await AgentRunnerService(self.db).run(tenant_id, user_id, agent_id, payload)
         session = self.resources.create(
             "agent_debug_sessions",
             tenant_id,

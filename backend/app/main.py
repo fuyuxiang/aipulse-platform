@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -11,7 +14,9 @@ from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.tracing import RequestContextMiddleware
 from app.db.base import Base
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
+from app.models.core import Tenant
+from app.services.scheduler_service import SchedulerService
 
 
 def create_app() -> FastAPI:
@@ -37,8 +42,37 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "healthy"}
 
+    scheduler_task: asyncio.Task[None] | None = None
+
+    @app.on_event("startup")
+    async def start_scheduler() -> None:
+        nonlocal scheduler_task
+        if settings.scheduler_enabled and scheduler_task is None:
+            scheduler_task = asyncio.create_task(_scheduler_loop())
+
+    @app.on_event("shutdown")
+    async def stop_scheduler() -> None:
+        nonlocal scheduler_task
+        if scheduler_task is not None:
+            scheduler_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await scheduler_task
+            scheduler_task = None
+
     return app
 
 
 app = create_app()
 
+
+async def _scheduler_loop() -> None:
+    while True:
+        await asyncio.sleep(max(5, int(settings.scheduler_poll_seconds)))
+        with SessionLocal() as db:
+            tenant_ids = list(db.scalars(select(Tenant.id).where(Tenant.status == "active", Tenant.deleted_at.is_(None))).all())
+            service = SchedulerService(db)
+            for tenant_id in tenant_ids:
+                try:
+                    await service.run_due_jobs(tenant_id, "system")
+                except Exception:
+                    continue

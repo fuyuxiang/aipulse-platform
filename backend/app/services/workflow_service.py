@@ -4,6 +4,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,6 +13,7 @@ from app.core.errors import AppError
 from app.services.knowledge_service import KnowledgeService
 from app.services.model_services import ModelInvocationService
 from app.services.resource_service import ResourceService
+from app.services.tool_service import ToolService
 
 project_root = settings.project_root
 if str(project_root) not in sys.path:
@@ -226,9 +228,60 @@ class WorkflowService:
         if node_type in {"rag", "rag_retrieve"} and config.get("knowledge_base_id"):
             retrieval = KnowledgeService(self.db).retrieve(tenant_id, user_id, str(config["knowledge_base_id"]), dict(config.get("payload") or context))
             return {"status": "success", "type": node_type, "retrieval": retrieval}
-        if node_type in {"script", "transform", "http", "tool", "agent"}:
-            return {"status": "success", "type": node_type, "output": config.get("output", config or context)}
+        if node_type == "transform":
+            return {"status": "success", "type": node_type, "output": self._transform(config, context)}
+        if node_type == "script":
+            if config.get("output") is not None:
+                return {"status": "success", "type": node_type, "output": config.get("output")}
+            raise AppError(ErrorCode.VALIDATION_ERROR, "script node requires a sandboxed tool_id; inline script execution is disabled", 422)
+        if node_type == "http":
+            return await self._execute_http_node(config, context)
+        if node_type == "tool":
+            tool_id = str(config.get("tool_id") or config.get("id") or "")
+            if not tool_id:
+                raise AppError(ErrorCode.VALIDATION_ERROR, "tool node requires tool_id", 422)
+            result = await ToolService(self.db).invoke(tenant_id, user_id, tool_id, {"arguments": dict(config.get("arguments") or config.get("payload") or context)})
+            return {"status": "success", "type": node_type, "tool": result}
+        if node_type == "agent":
+            agent_id = str(config.get("agent_id") or "")
+            if not agent_id:
+                raise AppError(ErrorCode.VALIDATION_ERROR, "agent node requires agent_id", 422)
+            from app.runtime.service import RuntimeControlService
+
+            prompt = str(config.get("prompt") or context.get("input") or context.get("prompt") or context)
+            result = await RuntimeControlService(self.db).debug_run(tenant_id, user_id, agent_id, {"prompt": prompt, "session_id": run_id, **dict(config.get("runtime") or {})})
+            return {"status": "success", "type": node_type, "agent": result}
         raise AppError(ErrorCode.VALIDATION_ERROR, f"unsupported workflow node type: {node_type}", 422)
+
+    async def _execute_http_node(self, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        url = str(config.get("url") or "")
+        if not url.startswith(("http://", "https://")):
+            raise AppError(ErrorCode.VALIDATION_ERROR, "http node requires url", 422)
+        method = str(config.get("method") or "POST").upper()
+        headers = dict(config.get("headers") or {})
+        body = config.get("body", config.get("payload", context))
+        async with httpx.AsyncClient(timeout=float(config.get("timeout_seconds") or 30)) as client:
+            response = await client.request(method, url, headers=headers, json=body if method not in {"GET", "HEAD"} else None)
+        payload: Any
+        if "application/json" in response.headers.get("content-type", ""):
+            payload = response.json()
+        else:
+            payload = response.text
+        if response.status_code >= 400:
+            raise AppError(ErrorCode.BUSINESS_ERROR, f"http node failed with status {response.status_code}", response.status_code)
+        return {"status": "success", "type": "http", "status_code": response.status_code, "output": payload}
+
+    @staticmethod
+    def _transform(config: dict[str, Any], context: dict[str, Any]) -> Any:
+        if "output" in config:
+            return config["output"]
+        pick = config.get("pick")
+        if isinstance(pick, list):
+            return {str(key): context.get(str(key)) for key in pick}
+        if isinstance(pick, str) and pick:
+            return context.get(pick)
+        merge = dict(config.get("merge") or {})
+        return {**context, **merge}
 
     @staticmethod
     def _nodes(workflow: Any, payload: dict[str, Any]) -> list[dict[str, Any]]:

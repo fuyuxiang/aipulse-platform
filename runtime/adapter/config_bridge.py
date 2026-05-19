@@ -24,6 +24,8 @@ class ConfigBridge:
             api_key=model_config.get("api_key", ""),
             api_base=model_config.get("api_base", ""),
             models=[model_config.get("model_name", "aipulse-local")],
+            extra_headers=dict(model_config.get("extra_headers") or {}),
+            timeout_seconds=int(model_config.get("timeout_seconds") or 120),
         )
         return Config(
             workspace=str(workspace),
