@@ -33,103 +33,103 @@ interface PageMeta {
 
 const PAGE_META: Record<string, PageMeta> = {
   '/agents': {
-    domain: 'Agent Factory',
-    description: '沉淀可复用的企业智能体资产，统一管理版本、发布、调试与运行策略。',
+    domain: '智能体管理',
+    description: '统一管理企业智能体资产，包括版本控制、发布管理和运行策略配置。',
     owner: '智能体研发中心',
     objective: '生产可用',
   },
   '/workflows': {
-    domain: 'Workflow Orchestration',
-    description: '以 DAG 方式编排工具、模型、知识和人工审批，支撑端到端业务自动化。',
+    domain: '工作流编排',
+    description: '可视化编排工具、模型、知识库和人工审批节点，支撑端到端业务自动化。',
     owner: '流程自动化平台',
     objective: '稳定编排',
   },
   '/prompt-templates': {
-    domain: 'Prompt Governance',
-    description: '管理 Prompt 模板、变量、评测和版本，保证提示词资产可追踪可复用。',
-    owner: 'Prompt 工程组',
+    domain: '提示词管理',
+    description: '管理提示词模板、变量、评测和版本，确保提示词资产可追踪可复用。',
+    owner: '提示词工程组',
     objective: '质量一致',
   },
   '/tools': {
-    domain: 'Tool Center',
-    description: '接入内部系统、MCP 工具和外部 API，提供权限、调用和审计控制。',
+    domain: '工具中心',
+    description: '接入内部系统和外部 API，提供统一的权限管控、调用管理和审计能力。',
     owner: '平台连接器组',
     objective: '安全调用',
   },
   '/knowledge-bases': {
-    domain: 'Knowledge & RAG',
-    description: '统一管理企业知识源、索引重建、检索测试和上下文引用质量。',
+    domain: '知识库管理',
+    description: '统一管理企业知识源、索引构建、检索测试和上下文引用质量。',
     owner: '知识工程组',
     objective: '可信引用',
   },
   '/memories': {
-    domain: 'Memory Center',
-    description: '管理长期记忆、会话沉淀、检索策略和上下文压缩结果。',
+    domain: '记忆管理',
+    description: '管理长期记忆、会话沉淀、检索策略和上下文压缩。',
     owner: '上下文工程组',
     objective: '持续学习',
   },
   '/models': {
-    domain: 'Model Hub',
-    description: '统一管理模型供应商、模型版本、健康检查、路由和熔断策略。',
+    domain: '模型管理',
+    description: '统一管理模型供应商、模型版本、健康检查、路由和容错策略。',
     owner: '模型平台组',
     objective: '弹性供给',
   },
   '/model-routing-policies': {
-    domain: 'Model Routing',
-    description: '按成本、延迟、质量与合规约束调度模型，降低生产调用风险。',
+    domain: '模型路由',
+    description: '按成本、延迟、质量与合规约束智能调度模型，降低调用风险。',
     owner: '模型平台组',
     objective: '智能分流',
   },
   '/security/content-policies': {
-    domain: 'Security Policy',
+    domain: '安全策略',
     description: '管理内容安全、工具权限、路径访问和高风险动作审批策略。',
     owner: '安全治理组',
     objective: '风险可控',
   },
   '/guardrails/policies': {
-    domain: 'Guardrails',
-    description: '统一配置输入输出护栏、违规动作、脱敏与阻断策略。',
+    domain: '安全护栏',
+    description: '统一配置输入输出护栏、违规处置、数据脱敏与内容拦截策略。',
     owner: '安全治理组',
     objective: '合规运行',
   },
   '/evaluation/datasets': {
-    domain: 'Evaluation',
+    domain: '质量评测',
     description: '维护评测数据集、运行记录和质量指标，支撑上线前验收。',
     owner: '质量评测组',
     objective: '可量化',
   },
   '/audit-logs': {
-    domain: 'Audit',
+    domain: '审计日志',
     description: '追踪关键操作、敏感动作、发布变更和合规证据。',
     owner: '平台治理组',
     objective: '可追溯',
   },
   '/cost/summary': {
-    domain: 'FinOps',
-    description: '分析模型、Agent、租户和业务线成本，支撑预算与优化。',
+    domain: '成本分析',
+    description: '分析模型、智能体、租户和业务线成本，支撑预算管理与优化。',
     owner: '成本治理组',
     objective: '成本透明',
   },
   '/alerts/rules': {
-    domain: 'Alerting',
-    description: '配置运行告警、SLA 阈值和通知策略，保障生产连续性。',
+    domain: '告警管理',
+    description: '配置运行告警规则、服务等级阈值和通知策略，保障业务连续性。',
     owner: '运行保障组',
     objective: '及时响应',
   },
   '/tenants': {
-    domain: 'Tenant Management',
+    domain: '租户管理',
     description: '管理企业租户、隔离域、资源配额和组织级策略。',
     owner: '平台管理员',
     objective: '多租户',
   },
   '/users': {
-    domain: 'Identity & RBAC',
+    domain: '用户与权限',
     description: '管理用户、角色、权限和组织成员访问边界。',
     owner: '平台管理员',
     objective: '最小权限',
   },
   '/system/configs': {
-    domain: 'System Settings',
+    domain: '系统配置',
     description: '维护平台级开关、运行参数、集成配置和基础设施能力。',
     owner: '平台管理员',
     objective: '可运维',
@@ -139,7 +139,7 @@ const PAGE_META: Record<string, PageMeta> = {
 function getPageMeta(page: PageConfig): PageMeta {
   return PAGE_META[page.api] || {
     domain: page.group,
-    description: `集中管理 ${page.title} 资源，保持状态、配置、权限和运行记录一致。`,
+    description: `集中管理${page.title}资源，统一维护状态、配置和权限。`,
     owner: '平台运营团队',
     objective: '统一管控',
   };
@@ -197,7 +197,7 @@ export function ResourcePage({ page }: Props): JSX.Element {
       render: (value: string, row) => (
         <Space direction="vertical" size={0}>
           <Typography.Text strong>{value || row.code || row.id}</Typography.Text>
-          <Typography.Text type="secondary" className="text-xs">{row.description || '暂无描述'}</Typography.Text>
+          <Typography.Text type="secondary" className="text-xs">{row.description || ''}</Typography.Text>
         </Space>
       ),
     },
@@ -288,7 +288,7 @@ export function ResourcePage({ page }: Props): JSX.Element {
             />
             <Button icon={<FilterOutlined />}>高级筛选</Button>
           </Space>
-          <Typography.Text type="secondary">当前页 {rows.length} 条，数据域：{meta.domain}</Typography.Text>
+          <Typography.Text type="secondary">共 {rows.length} 条记录</Typography.Text>
         </div>
       </Card>
 
@@ -311,9 +311,9 @@ export function ResourcePage({ page }: Props): JSX.Element {
             <Field name="code" title="编码" decorator={[FormItem]} component={[Input]} />
             <Field name="description" title="描述" decorator={[FormItem]} component={[Input.TextArea, { rows: 3 }]} />
             <Field name="model_type" title="模型类型" decorator={[FormItem]} component={[Input]} />
-            <Field name="provider_type" title="Provider 类型" decorator={[FormItem]} component={[Input]} />
-            <Field name="configText" title="配置 JSON" decorator={[FormItem]} component={[Input.TextArea, { rows: 5 }]} />
-            <Field name="specText" title="规格 JSON" decorator={[FormItem]} component={[Input.TextArea, { rows: 5 }]} />
+            <Field name="provider_type" title="供应商类型" decorator={[FormItem]} component={[Input]} />
+            <Field name="configText" title="配置信息" decorator={[FormItem]} component={[Input.TextArea, { rows: 5, placeholder: '请输入 JSON 格式的配置' }]} />
+            <Field name="specText" title="规格信息" decorator={[FormItem]} component={[Input.TextArea, { rows: 5, placeholder: '请输入 JSON 格式的规格' }]} />
           </Form>
         </FormProvider>
       </Drawer>

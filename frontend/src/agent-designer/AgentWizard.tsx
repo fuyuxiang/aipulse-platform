@@ -39,45 +39,51 @@ export function AgentWizard({ onCreated }: AgentWizardProps): JSX.Element {
           created_from: 'agent_wizard',
         },
       });
-      message.success('Agent 已创建');
+      message.success('智能体创建成功');
       form.resetFields();
       setCurrent(0);
       onCreated?.();
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Agent 创建失败');
+      message.error(error instanceof Error ? error.message : '创建失败，请检查配置');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Card className="mb-5" title="Agent 创建向导">
+    <Card className="mb-5" title="智能体创建向导">
       <Steps current={current} items={steps.map((title) => ({ title }))} />
       <Form form={form} layout="vertical" className="mt-5" initialValues={{ model_type: 'chat_llm', memory_policy: '{\"enabled\":true}' }}>
         {current === 0 ? (
           <>
-            <Form.Item name="name" label="Agent 名称" rules={[{ required: true, message: '请输入 Agent 名称' }]}><Input /></Form.Item>
-            <Form.Item name="code" label="编码"><Input /></Form.Item>
-            <Form.Item name="description" label="描述"><Input.TextArea rows={3} /></Form.Item>
+            <Form.Item name="name" label="智能体名称" rules={[{ required: true, message: '请输入智能体名称' }]}><Input placeholder="例如：客服助手" /></Form.Item>
+            <Form.Item name="code" label="编码"><Input placeholder="唯一标识，留空自动生成" /></Form.Item>
+            <Form.Item name="description" label="描述"><Input.TextArea rows={3} placeholder="描述该智能体的用途和能力" /></Form.Item>
           </>
         ) : null}
         {current === 1 ? (
           <>
             <Form.Item name="model_type" label="模型类型" rules={[{ required: true }]}>
-              <Select options={['chat_llm', 'reasoning_llm', 'vision_language', 'embedding', 'rerank'].map((value) => ({ value, label: value }))} />
+              <Select options={[
+                { value: 'chat_llm', label: '对话模型' },
+                { value: 'reasoning_llm', label: '推理模型' },
+                { value: 'vision_language', label: '多模态模型' },
+                { value: 'embedding', label: '向量模型' },
+                { value: 'rerank', label: '重排序模型' },
+              ]} />
             </Form.Item>
-            <Form.Item name="model_id" label="模型资源 ID"><Input /></Form.Item>
-            <Form.Item name="model_config" label="运行时模型配置 JSON"><Input.TextArea rows={4} /></Form.Item>
+            <Form.Item name="model_id" label="模型"><Input placeholder="选择已注册的模型资源" /></Form.Item>
+            <Form.Item name="model_config" label="模型运行参数"><Input.TextArea rows={4} placeholder='{"temperature": 0.7, "max_tokens": 4096}' /></Form.Item>
           </>
         ) : null}
-        {current === 2 ? <Form.Item name="system_prompt" label="系统提示词"><Input.TextArea rows={5} /></Form.Item> : null}
-        {current === 3 ? <Form.Item name="tool_ids" label="工具 ID，多个用逗号分隔"><Input.TextArea rows={3} /></Form.Item> : null}
-        {current === 4 ? <Form.Item name="knowledge_base_ids" label="知识库 ID，多个用逗号分隔"><Input.TextArea rows={3} /></Form.Item> : null}
-        {current === 5 ? <Form.Item name="memory_policy" label="记忆策略 JSON"><Input.TextArea rows={4} /></Form.Item> : null}
+        {current === 2 ? <Form.Item name="system_prompt" label="系统提示词"><Input.TextArea rows={5} placeholder="定义智能体的角色、能力和行为规范" /></Form.Item> : null}
+        {current === 3 ? <Form.Item name="tool_ids" label="绑定工具"><Input.TextArea rows={3} placeholder="输入工具 ID，多个以逗号分隔" /></Form.Item> : null}
+        {current === 4 ? <Form.Item name="knowledge_base_ids" label="关联知识库"><Input.TextArea rows={3} placeholder="输入知识库 ID，多个以逗号分隔" /></Form.Item> : null}
+        {current === 5 ? <Form.Item name="memory_policy" label="记忆策略配置"><Input.TextArea rows={4} placeholder='{"enabled": true, "scope": "session"}' /></Form.Item> : null}
         {current === 6 ? (
           <>
-            <Form.Item name="guardrail_policy_ids" label="护栏策略 ID，多个用逗号分隔"><Input /></Form.Item>
-            <Form.Item name="tool_policy" label="工具权限策略 JSON"><Input.TextArea rows={4} /></Form.Item>
+            <Form.Item name="guardrail_policy_ids" label="关联安全护栏"><Input placeholder="输入护栏策略 ID，多个以逗号分隔" /></Form.Item>
+            <Form.Item name="tool_policy" label="工具权限配置"><Input.TextArea rows={4} placeholder='{"allowed_tools": [], "require_approval": false}' /></Form.Item>
           </>
         ) : null}
       </Form>
@@ -86,7 +92,7 @@ export function AgentWizard({ onCreated }: AgentWizardProps): JSX.Element {
         {current < steps.length - 1 ? (
           <Button type="primary" disabled={saving} onClick={() => setCurrent((value) => value + 1)}>下一步</Button>
         ) : (
-          <Button type="primary" loading={saving} onClick={() => void submit()}>保存 Agent</Button>
+          <Button type="primary" loading={saving} onClick={() => void submit()}>创建智能体</Button>
         )}
       </Space>
     </Card>

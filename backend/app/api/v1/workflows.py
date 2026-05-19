@@ -145,6 +145,39 @@ def replay_workflow_run(run_id: str, tenant_id: TenantIdDep, user: User = Depend
     return WorkflowService(db).replay(tenant_id, user.id, run_id)
 
 
+@router.post("/workflow-runs/{run_id}/resume")
+async def resume_workflow_run(
+    run_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await WorkflowService(db).resume_from_checkpoint(tenant_id, user.id, run_id, dict(payload))
+
+
+@router.get("/workflow-runs/{run_id}/checkpoints")
+async def workflow_run_checkpoints(
+    run_id: str,
+    tenant_id: TenantIdDep,
+    _: User = Depends(require_permission("workflows:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    checkpoints = await WorkflowService(db).list_checkpoints(tenant_id, run_id)
+    return {"run_id": run_id, "checkpoints": checkpoints}
+
+
+@router.post("/workflow-events/{event_name}/trigger")
+async def trigger_workflow_event(
+    event_name: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await WorkflowService(db).trigger_event(tenant_id, user.id, event_name, dict(payload))
+
+
 add_list_route(router, method="get", path="/workflow-approvals", table="workflow_approvals", permission="workflows")
 
 

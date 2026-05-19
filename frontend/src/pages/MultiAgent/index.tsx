@@ -135,7 +135,7 @@ export function MultiAgentPage(): JSX.Element {
   return (
     <div className="p-5">
       <div className="mb-4 flex justify-between">
-        <h3>Multi-Agent 协作</h3>
+        <h3>多智能体协同</h3>
         <Button type="primary" onClick={() => setDrawerOpen(true)}>创建团队</Button>
       </div>
       <Table rowKey="id" columns={columns} dataSource={teams} loading={loading} pagination={{ pageSize: 20 }} />
@@ -160,7 +160,7 @@ export function MultiAgentPage(): JSX.Element {
         </Form>
       </Drawer>
 
-      <Modal open={runModalOpen} title="执行 Multi-Agent 任务" onCancel={() => { setRunModalOpen(false); setRunResult(null); }} footer={null} width={700}>
+      <Modal open={runModalOpen} title="执行多智能体任务" onCancel={() => { setRunModalOpen(false); setRunResult(null); }} footer={null} width={700}>
         <Input.TextArea rows={3} value={runPrompt} onChange={(e) => setRunPrompt(e.target.value)} placeholder="输入任务描述..." />
         <Button type="primary" className="mt-3" onClick={() => void runTeam()}>执行</Button>
         {runResult && (

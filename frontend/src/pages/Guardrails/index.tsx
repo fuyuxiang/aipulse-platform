@@ -92,7 +92,7 @@ export function GuardrailsPage(): JSX.Element {
       <div className="mb-4 flex justify-between">
         <Space>
           <Button type="primary" onClick={() => setDrawerOpen(true)}>创建策略</Button>
-          <Button onClick={() => setTestDrawerOpen(true)}>护栏测试</Button>
+          <Button onClick={() => setTestDrawerOpen(true)}>护栏验证</Button>
         </Space>
       </div>
 
@@ -113,24 +113,24 @@ export function GuardrailsPage(): JSX.Element {
           </Form.Item>
           <Form.Item name="enabled_checks" label="启用检查" initialValue={['pii_detection', 'prompt_injection', 'content_safety']}>
             <Select mode="multiple" options={[
-              { value: 'pii_detection', label: 'PII 检测' },
-              { value: 'prompt_injection', label: 'Prompt 注入检测' },
+              { value: 'pii_detection', label: '个人信息检测' },
+              { value: 'prompt_injection', label: '提示词注入检测' },
               { value: 'content_safety', label: '内容安全' },
               { value: 'output_format', label: '输出格式校验' },
-              { value: 'hallucination_detection', label: '幻觉检测' },
-              { value: 'topic_restriction', label: '话题限制' },
+              { value: 'hallucination_detection', label: '事实性检测' },
+              { value: 'topic_restriction', label: '话题范围限制' },
             ]} />
           </Form.Item>
         </Form>
       </Drawer>
 
-      <Drawer open={testDrawerOpen} title="护栏测试" width={600} onClose={() => { setTestDrawerOpen(false); setTestResult(null); }}>
+      <Drawer open={testDrawerOpen} title="护栏验证" width={600} onClose={() => { setTestDrawerOpen(false); setTestResult(null); }}>
         <Space direction="vertical" className="w-full" size="middle">
           <Select value={testScope} onChange={setTestScope} className="w-full" options={[{ value: 'input', label: '输入检测' }, { value: 'output', label: '输出检测' }]} />
-          <Input.TextArea rows={5} value={testContent} onChange={(e) => setTestContent(e.target.value)} placeholder="输入要检测的内容..." />
-          <Button type="primary" onClick={() => void runTest()}>执行检测</Button>
+          <Input.TextArea rows={5} value={testContent} onChange={(e) => setTestContent(e.target.value)} placeholder="输入待检测的内容" />
+          <Button type="primary" onClick={() => void runTest()}>开始检测</Button>
           {testResult && (
-            <Card size="small" title={testResult.passed ? '✅ 通过' : '❌ 未通过'}>
+            <Card size="small" title={testResult.passed ? '通过' : '未通过'}>
               <p>动作: <Tag color={testResult.action === 'block' ? 'red' : 'orange'}>{testResult.action}</Tag></p>
               {testResult.violations?.length > 0 && (
                 <div>

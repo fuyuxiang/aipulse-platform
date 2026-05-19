@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from datetime import datetime, timezone
 from typing import Any
@@ -20,6 +21,9 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from runtime.executors.workflow_executor import WorkflowExecutor, WorkflowValidationError  # noqa: E402
+from runtime.executors.workflow_checkpoint import CheckpointStore, build_checkpoint  # noqa: E402
+from runtime.executors.workflow_compensation import CompensationEngine, CompensationStrategy  # noqa: E402
+from runtime.executors.workflow_events import EventBus, get_event_bus  # noqa: E402
 
 
 class WorkflowService:
@@ -27,6 +31,8 @@ class WorkflowService:
         self.db = db
         self.resources = ResourceService(db)
         self.executor = WorkflowExecutor()
+        self._checkpoint_store = CheckpointStore(settings.resolved_data_dir / "checkpoints")
+        self._event_bus = get_event_bus()
 
     def create_version(self, tenant_id: str, user_id: str, workflow_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         workflow = self.resources.get("workflow_definitions", tenant_id, workflow_id)
@@ -102,54 +108,190 @@ class WorkflowService:
             },
         )
         context = dict(payload.get("context") or {})
-        results: dict[str, Any] = {}
-        node_map = {str(node["id"]): node for node in nodes}
-        try:
-            for node_id in plan["order"]:
-                node = node_map[node_id]
-                step = self.resources.create(
-                    "workflow_run_steps",
-                    tenant_id,
-                    user_id,
-                    {"name": str(node.get("label") or node_id), "status": "running", "workflow_id": workflow.id, "run_id": run.id, "spec": {"node": node}},
-                )
-                result = await self._execute_node(tenant_id, user_id, workflow.id, run.id, node, context)
-                if result.get("status") == "waiting_approval":
-                    self.resources.update("workflow_run_steps", tenant_id, user_id, step.id, {"status": "waiting_approval", "output_payload": result})
-                    self.resources.update("workflow_runs", tenant_id, user_id, run.id, {"status": "waiting_approval", "output_payload": {"results": results, "waiting": result}})
-                    return {"run_id": run.id, "status": "waiting_approval", "waiting": result, "results": results}
-                results[node_id] = result
-                context[node_id] = result
-                self.resources.update("workflow_run_steps", tenant_id, user_id, step.id, {"status": "success", "output_payload": result})
-                self.resources.create(
-                    "workflow_run_logs",
-                    tenant_id,
-                    user_id,
-                    {"name": f"node {node_id}", "status": "success", "workflow_id": workflow.id, "run_id": run.id, "parent_id": step.id, "output_payload": result},
-                )
-            self.resources.update(
-                "workflow_runs",
-                tenant_id,
-                user_id,
-                run.id,
-                {"status": "success", "finished_at": datetime.now(timezone.utc), "output_payload": {"results": results, "context": context}},
+        handlers = self._build_handlers(tenant_id, user_id, workflow.id, run.id)
+        compensation_strategy = str(payload.get("compensation_strategy", "backward_recovery"))
+        timeout_seconds = float(payload.get("timeout_seconds", 0))
+
+        async def checkpoint_cb(cp: dict[str, Any]) -> None:
+            checkpoint = build_checkpoint(
+                run_id=run.id,
+                results=cp.get("results", {}),
+                context=cp.get("context", {}),
+                compensation_stack=cp.get("compensation_stack", []),
             )
-            return {"run_id": run.id, "status": "success", "results": results, "context": context}
-        except Exception as exc:
-            self.resources.update(
-                "workflow_runs",
-                tenant_id,
-                user_id,
-                run.id,
-                {"status": "failed", "finished_at": datetime.now(timezone.utc), "error_message": str(exc), "output_payload": {"results": results}},
+            await self._checkpoint_store.save(checkpoint)
+            self.resources.create(
+                "workflow_run_events", tenant_id, user_id,
+                {"name": "checkpoint", "status": "saved", "workflow_id": workflow.id, "run_id": run.id, "output_payload": {"checkpoint_id": checkpoint.id}},
+            )
+
+        async def event_wait_cb(event_name: str, config: dict[str, Any]) -> Any:
+            action = config.get("action", "wait")
+            if action == "emit":
+                self._event_bus.trigger(event_name, payload=config.get("payload", {}), source_run_id=run.id)
+                return {"status": "emitted", "event_name": event_name}
+            sub = self._event_bus.subscribe(
+                workflow_run_id=run.id, node_id=config.get("node_id", ""),
+                event_name=event_name, timeout_seconds=float(config.get("timeout_seconds", 3600)),
             )
             self.resources.create(
-                "workflow_run_events",
-                tenant_id,
-                user_id,
+                "workflow_run_events", tenant_id, user_id,
+                {"name": f"waiting_{event_name}", "status": "waiting", "workflow_id": workflow.id, "run_id": run.id, "output_payload": {"subscription_id": sub.id}},
+            )
+            result = await self._event_bus.wait_for_event(sub.id)
+            return result
+
+        async def compensation_cb(comp_config: dict[str, Any], ctx: dict[str, Any]) -> None:
+            comp_type = comp_config.get("type", "")
+            if comp_type == "http":
+                async with httpx.AsyncClient(timeout=30) as client:
+                    await client.request(comp_config.get("method", "POST"), comp_config.get("url", ""), json=ctx)
+            elif comp_type == "agent":
+                from app.services.agent_runner_service import AgentRunnerService
+                await AgentRunnerService(self.db).run(tenant_id, user_id, comp_config.get("agent_id", ""), {"prompt": comp_config.get("prompt", "rollback"), "context": ctx})
+
+        try:
+            result = await self.executor.run(
+                nodes, edges, handlers, initial_context=context,
+                checkpoint_callback=checkpoint_cb,
+                event_wait_callback=event_wait_cb,
+                compensation_callback=compensation_cb,
+                timeout_seconds=timeout_seconds,
+            )
+            status = result.get("status", "success")
+            if status == "waiting_approval":
+                self.resources.update(
+                    "workflow_runs", tenant_id, user_id, run.id,
+                    {"status": status, "output_payload": result},
+                )
+                waiting_info = {"approval_id": result.get("pending_approval", "")}
+                for nid, nr in result.get("results", {}).items():
+                    if isinstance(nr, dict) and nr.get("output") and isinstance(nr["output"], dict) and nr["output"].get("status") == "waiting_approval":
+                        waiting_info = nr["output"]
+                        break
+                return {"run_id": run.id, "status": status, "waiting": waiting_info, "results": self._unwrap_results(result.get("results", {}))}
+            self.resources.update(
+                "workflow_runs", tenant_id, user_id, run.id,
+                {"status": status, "finished_at": datetime.now(timezone.utc), "output_payload": result},
+            )
+            unwrapped = self._unwrap_results(result.get("results", {}))
+            return {"run_id": run.id, "status": status, "results": unwrapped, "context": result.get("context", {})}
+        except Exception as exc:
+            self.resources.update(
+                "workflow_runs", tenant_id, user_id, run.id,
+                {"status": "failed", "finished_at": datetime.now(timezone.utc), "error_message": str(exc)},
+            )
+            self.resources.create(
+                "workflow_run_events", tenant_id, user_id,
                 {"name": "workflow failed", "status": "failed", "workflow_id": workflow.id, "run_id": run.id, "error_message": str(exc)},
             )
             raise
+
+    async def resume_from_checkpoint(self, tenant_id: str, user_id: str, run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Resume a workflow from its latest checkpoint."""
+        run = self.resources.get("workflow_runs", tenant_id, run_id)
+        if not run.workflow_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "run has no workflow_id", 422)
+
+        checkpoint_id = payload.get("checkpoint_id")
+        if checkpoint_id:
+            checkpoint = await self._checkpoint_store.load(run_id, checkpoint_id)
+        else:
+            checkpoint = await self._checkpoint_store.load_latest(run_id)
+
+        if not checkpoint:
+            raise AppError(ErrorCode.NOT_FOUND, "no checkpoint found for this run", 404)
+
+        workflow = self.resources.get("workflow_definitions", tenant_id, run.workflow_id)
+        nodes = (run.spec or {}).get("nodes") or self._nodes(workflow, payload)
+        edges = (run.spec or {}).get("edges") or self._edges(workflow, payload)
+        handlers = self._build_handlers(tenant_id, user_id, run.workflow_id, run_id)
+
+        self.resources.update("workflow_runs", tenant_id, user_id, run_id, {"status": "running"})
+
+        try:
+            result = await self.executor.resume(
+                nodes, edges, handlers, checkpoint.to_dict(),
+                timeout_seconds=float(payload.get("timeout_seconds", 0)),
+            )
+            status = result.get("status", "success")
+            self.resources.update(
+                "workflow_runs", tenant_id, user_id, run_id,
+                {"status": status, "finished_at": datetime.now(timezone.utc), "output_payload": result},
+            )
+            return {"run_id": run_id, **result}
+        except Exception as exc:
+            self.resources.update(
+                "workflow_runs", tenant_id, user_id, run_id,
+                {"status": "failed", "finished_at": datetime.now(timezone.utc), "error_message": str(exc)},
+            )
+            raise
+
+    async def trigger_event(self, tenant_id: str, user_id: str, event_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Trigger an event that may resume waiting workflows."""
+        notified = self._event_bus.trigger(event_name, payload=payload)
+        self.resources.create(
+            "workflow_run_events", tenant_id, user_id,
+            {"name": f"event_{event_name}", "status": "triggered", "output_payload": {"event_name": event_name, "notified_subscriptions": notified}},
+        )
+        return {"event_name": event_name, "notified": notified}
+
+    async def list_checkpoints(self, tenant_id: str, run_id: str) -> list[dict[str, Any]]:
+        """List all checkpoints for a workflow run."""
+        checkpoints = await self._checkpoint_store.list_checkpoints(run_id)
+        return [cp.to_dict() for cp in checkpoints]
+
+    def _build_handlers(self, tenant_id: str, user_id: str, workflow_id: str, run_id: str) -> dict[str, Any]:
+        """Build node type handlers for the executor.
+
+        Note: The executor passes node config (not the full node) as the first argument.
+        """
+        async def model_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return await self._invoke_model(tenant_id, user_id, config, context)
+
+        async def rag_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return self._invoke_rag(tenant_id, user_id, config, context)
+
+        async def agent_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return await self._invoke_agent(tenant_id, user_id, config, context)
+
+        async def tool_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return await self._invoke_tool(tenant_id, user_id, config, context)
+
+        async def http_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return await self._invoke_http(config, context)
+
+        async def transform_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return self._transform(config, context)
+
+        async def approval_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            approval = self.resources.create(
+                "workflow_approvals", tenant_id, user_id,
+                {"name": "approval", "status": "pending", "workflow_id": workflow_id, "run_id": run_id, "spec": {"approvers": config.get("approvers", [])}},
+            )
+            return {"status": "waiting_approval", "approval_id": approval.id}
+
+        async def sub_workflow_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            sub_workflow_id = str(config.get("workflow_id", ""))
+            sub_payload = dict(config.get("payload") or {})
+            sub_payload["context"] = context
+            return await self.run(tenant_id, user_id, sub_workflow_id, sub_payload)
+
+        async def default_handler(config: dict[str, Any], context: dict[str, Any]) -> Any:
+            return {"status": "success"}
+
+        return {
+            "model": model_handler, "chat_llm": model_handler,
+            "vision_language": model_handler, "embedding": model_handler, "rerank": model_handler,
+            "rag": rag_handler, "rag_retrieve": rag_handler,
+            "agent": agent_handler,
+            "tool": tool_handler,
+            "http": http_handler,
+            "transform": transform_handler, "script": transform_handler,
+            "approval": approval_handler, "human_approval": approval_handler,
+            "sub_workflow": sub_workflow_handler,
+            "default": default_handler,
+        }
 
     async def retry(self, tenant_id: str, user_id: str, run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         run = self.resources.get("workflow_runs", tenant_id, run_id)
@@ -196,64 +338,38 @@ class WorkflowService:
         )
         return {"approval_id": approval.id, "event_id": event.id, "status": approval.status, "approved": approved}
 
-    async def _execute_node(self, tenant_id: str, user_id: str, workflow_id: str, run_id: str, node: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-        node_type = str(node.get("type") or node.get("shape") or "script")
-        config = dict(node.get("config") or node.get("data") or {})
-        if node_type in {"start", "end", "aggregate", "parallel"}:
-            return {"status": "success", "type": node_type, "context_keys": sorted(context)}
-        if node_type in {"approval", "human_approval"}:
-            approval = self.resources.create(
-                "workflow_approvals",
-                tenant_id,
-                user_id,
-                {
-                    "name": str(node.get("label") or "approval"),
-                    "status": "pending",
-                    "workflow_id": workflow_id,
-                    "run_id": run_id,
-                    "spec": {"node": node, "approvers": config.get("approvers", [])},
-                },
-            )
-            return {"status": "waiting_approval", "approval_id": approval.id, "type": node_type}
-        if node_type in {"condition", "branch"}:
-            left = context.get(str(config.get("left") or "input"), config.get("left_value"))
-            right = config.get("right_value")
-            operator = str(config.get("operator") or "equals")
-            matched = self._compare(left, right, operator)
-            return {"status": "success", "type": node_type, "matched": matched, "operator": operator}
-        if node_type in {"model", "chat_llm", "vision_language", "embedding", "rerank"} and config.get("model_id"):
-            model_type = str(config.get("model_type") or node_type)
-            invocation = await ModelInvocationService(self.db).invoke(tenant_id, user_id, str(config["model_id"]), model_type, dict(config.get("payload") or context))
-            return {"status": "success", "type": node_type, "invocation": invocation}
-        if node_type in {"rag", "rag_retrieve"} and config.get("knowledge_base_id"):
-            retrieval = KnowledgeService(self.db).retrieve(tenant_id, user_id, str(config["knowledge_base_id"]), dict(config.get("payload") or context))
-            return {"status": "success", "type": node_type, "retrieval": retrieval}
-        if node_type == "transform":
-            return {"status": "success", "type": node_type, "output": self._transform(config, context)}
-        if node_type == "script":
-            if config.get("output") is not None:
-                return {"status": "success", "type": node_type, "output": config.get("output")}
-            raise AppError(ErrorCode.VALIDATION_ERROR, "script node requires a sandboxed tool_id; inline script execution is disabled", 422)
-        if node_type == "http":
-            return await self._execute_http_node(config, context)
-        if node_type == "tool":
-            tool_id = str(config.get("tool_id") or config.get("id") or "")
-            if not tool_id:
-                raise AppError(ErrorCode.VALIDATION_ERROR, "tool node requires tool_id", 422)
-            result = await ToolService(self.db).invoke(tenant_id, user_id, tool_id, {"arguments": dict(config.get("arguments") or config.get("payload") or context)})
-            return {"status": "success", "type": node_type, "tool": result}
-        if node_type == "agent":
-            agent_id = str(config.get("agent_id") or "")
-            if not agent_id:
-                raise AppError(ErrorCode.VALIDATION_ERROR, "agent node requires agent_id", 422)
-            from app.runtime.service import RuntimeControlService
+    async def _invoke_model(self, tenant_id: str, user_id: str, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        model_type = str(config.get("model_type") or "chat_llm")
+        model_id = str(config.get("model_id") or "")
+        if not model_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "model node requires model_id", 422)
+        invocation = await ModelInvocationService(self.db).invoke(tenant_id, user_id, model_id, model_type, dict(config.get("payload") or context))
+        return {"status": "success", "type": "model", "invocation": invocation}
 
-            prompt = str(config.get("prompt") or context.get("input") or context.get("prompt") or context)
-            result = await RuntimeControlService(self.db).debug_run(tenant_id, user_id, agent_id, {"prompt": prompt, "session_id": run_id, **dict(config.get("runtime") or {})})
-            return {"status": "success", "type": node_type, "agent": result}
-        raise AppError(ErrorCode.VALIDATION_ERROR, f"unsupported workflow node type: {node_type}", 422)
+    def _invoke_rag(self, tenant_id: str, user_id: str, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        kb_id = str(config.get("knowledge_base_id") or "")
+        if not kb_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "rag node requires knowledge_base_id", 422)
+        retrieval = KnowledgeService(self.db).retrieve(tenant_id, user_id, kb_id, dict(config.get("payload") or context))
+        return {"status": "success", "type": "rag", "retrieval": retrieval}
 
-    async def _execute_http_node(self, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    async def _invoke_agent(self, tenant_id: str, user_id: str, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        agent_id = str(config.get("agent_id") or "")
+        if not agent_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "agent node requires agent_id", 422)
+        from app.runtime.service import RuntimeControlService
+        prompt = str(config.get("prompt") or context.get("input") or context.get("prompt") or str(context))
+        result = await RuntimeControlService(self.db).debug_run(tenant_id, user_id, agent_id, {"prompt": prompt, **dict(config.get("runtime") or {})})
+        return {"status": "success", "type": "agent", "agent": result}
+
+    async def _invoke_tool(self, tenant_id: str, user_id: str, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        tool_id = str(config.get("tool_id") or config.get("id") or "")
+        if not tool_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "tool node requires tool_id", 422)
+        result = await ToolService(self.db).invoke(tenant_id, user_id, tool_id, {"arguments": dict(config.get("arguments") or config.get("payload") or context)})
+        return {"status": "success", "type": "tool", "tool": result}
+
+    async def _invoke_http(self, config: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         url = str(config.get("url") or "")
         if not url.startswith(("http://", "https://")):
             raise AppError(ErrorCode.VALIDATION_ERROR, "http node requires url", 422)
@@ -270,6 +386,21 @@ class WorkflowService:
         if response.status_code >= 400:
             raise AppError(ErrorCode.BUSINESS_ERROR, f"http node failed with status {response.status_code}", response.status_code)
         return {"status": "success", "type": "http", "status_code": response.status_code, "output": payload}
+
+    @staticmethod
+    def _unwrap_results(results: dict[str, Any]) -> dict[str, Any]:
+        """Unwrap executor result format to backward-compatible format.
+
+        Executor returns: {node_id: {"status": ..., "output": ..., "error": ..., "duration_ms": ...}}
+        We return: {node_id: output} for backward compatibility.
+        """
+        unwrapped: dict[str, Any] = {}
+        for node_id, result in results.items():
+            if isinstance(result, dict) and "output" in result:
+                unwrapped[node_id] = result["output"]
+            else:
+                unwrapped[node_id] = result
+        return unwrapped
 
     @staticmethod
     def _transform(config: dict[str, Any], context: dict[str, Any]) -> Any:
