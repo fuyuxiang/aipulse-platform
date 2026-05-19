@@ -161,7 +161,33 @@ class ChatService:
         if rag_context:
             yield self._sse_event("rag_context", {"sources": rag_context})
 
-        full_response = await self._call_agent(tenant_id, user_id, agent_id, session_id, content, context_messages, rag_context, tool_ids, spec)
+        try:
+            full_response = await self._call_agent(tenant_id, user_id, agent_id, session_id, content, context_messages, rag_context, tool_ids, spec)
+        except Exception as exc:
+            latency_ms = int((time.time() - start_time) * 1000)
+            failed = self.resources.create("chat_messages", tenant_id, user_id, {
+                "name": f"failed reply {reply_id}",
+                "code": reply_id,
+                "status": "failed",
+                "session_id": session_id,
+                "agent_id": agent_id,
+                "user_id": "assistant",
+                "error_message": str(exc),
+                "spec": {
+                    "role": "assistant",
+                    "content": "",
+                    "attachments": [],
+                    "token_usage": {},
+                    "latency_ms": latency_ms,
+                    "model_id": spec.get("model_id", ""),
+                    "feedback": None,
+                    "rag_sources": rag_context,
+                    "tool_calls": [],
+                    "metadata": {"error": str(exc)},
+                },
+            })
+            yield self._sse_event("error", {"message_id": failed.id, "error": str(exc), "latency_ms": latency_ms})
+            return
 
         chunks = self._split_into_chunks(full_response)
         for i, chunk in enumerate(chunks):
@@ -210,23 +236,54 @@ class ChatService:
         prompt: str, context: list[dict[str, str]], rag_context: list[dict[str, Any]],
         tool_ids: list[str], session_spec: dict[str, Any],
     ) -> str:
-        try:
-            from app.runtime.service import RuntimeControlService
-            result = await RuntimeControlService(self.db).debug_run(
-                tenant_id, user_id, agent_id,
-                {"prompt": prompt, "session_id": session_id, "context": context, "rag_context": rag_context}
+        model_id = str(session_spec.get("model_id") or "")
+        if model_id:
+            from app.services.model_services import ModelInvocationService
+
+            messages = []
+            system_prompt = str(session_spec.get("system_prompt") or "")
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            if rag_context:
+                rag_text = "\n".join(f"[{s.get('title', '')}] {s.get('content', '')}" for s in rag_context)
+                messages.append({"role": "system", "content": f"Use the following retrieved knowledge when relevant:\n{rag_text}"})
+            messages.extend(context[-int(session_spec.get("context_window", 20) or 20):])
+            messages.append({"role": "user", "content": prompt})
+            invocation = await ModelInvocationService(self.db).invoke(
+                tenant_id,
+                user_id,
+                model_id,
+                "chat_llm",
+                {
+                    "messages": messages,
+                    "temperature": session_spec.get("temperature", 0.7),
+                    "max_tokens": session_spec.get("max_tokens", 4096),
+                    "tool_ids": tool_ids,
+                },
+            )
+            return str((invocation.get("result") or {}).get("content") or "")
+        if agent_id:
+            from app.services.agent_runner_service import AgentRunnerService
+
+            result = await AgentRunnerService(self.db).run(
+                tenant_id,
+                user_id,
+                agent_id,
+                {
+                    "prompt": prompt,
+                    "session_id": session_id,
+                    "context": context,
+                    "knowledge_base_ids": session_spec.get("knowledge_base_ids", []),
+                    "tool_ids": session_spec.get("tool_ids", []),
+                    "guardrail_policy_ids": session_spec.get("guardrail_policy_ids", []),
+                    "memory_policy": {"enabled": session_spec.get("memory_enabled", True), "write_scope": "session", "include_shared": True},
+                }
             )
             return str(result.get("response", ""))
-        except Exception:
-            system_prompt = session_spec.get("system_prompt", "")
-            rag_text = "\n".join(f"[{s.get('title', '')}]: {s.get('content', '')}" for s in rag_context) if rag_context else ""
-            context_text = "\n".join(f"{m['role']}: {m['content']}" for m in context[-10:])
-            return (
-                f"[Agent 回复] 基于上下文的回复。\n\n"
-                f"用户问题: {prompt}\n"
-                f"{'参考知识: ' + rag_text[:500] if rag_text else ''}\n"
-                f"上下文消息数: {len(context)}"
-            )
+        from app.core.constants import ErrorCode
+        from app.core.errors import AppError
+
+        raise AppError(ErrorCode.VALIDATION_ERROR, "chat session requires agent_id or model_id", 422)
 
     def _build_context(self, tenant_id: str, session_id: str, window: int) -> list[dict[str, str]]:
         rows, _ = self.resources.list("chat_messages", tenant_id, 1, window, {"session_id": session_id})
@@ -244,12 +301,13 @@ class ChatService:
             for kb_id in kb_ids[:3]:
                 try:
                     result = ks.retrieve(tenant_id, user_id, kb_id, {"query": query, "top_k": 3})
-                    for chunk in result.get("chunks", []):
+                    for chunk in result.get("matches", []) + result.get("chunks", []):
+                        metadata = dict(chunk.get("metadata") or {})
                         results.append({
                             "knowledge_base_id": kb_id,
                             "chunk_id": chunk.get("id", ""),
-                            "title": chunk.get("title", ""),
-                            "content": chunk.get("content", ""),
+                            "title": chunk.get("title") or metadata.get("document_name") or metadata.get("filename") or "",
+                            "content": chunk.get("content") or chunk.get("text", ""),
                             "score": chunk.get("score", 0),
                         })
                 except Exception:

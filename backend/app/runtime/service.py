@@ -23,6 +23,7 @@ class RuntimeControlService:
         self.adapter = get_runtime_adapter()
 
     async def create_instance(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        payload = self._hydrate_runtime_payload(tenant_id, agent_id, payload)
         workspace = settings.resolved_data_dir / "runtime" / tenant_id / agent_id / payload.get("session_id", "default")
         context = RuntimeContext(
             tenant_id=tenant_id,
@@ -75,6 +76,7 @@ class RuntimeControlService:
         return self._instance(instance)
 
     async def debug_run(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        payload = self._hydrate_runtime_payload(tenant_id, agent_id, payload)
         instances = [item for item in self.adapter.list(tenant_id) if item.context.agent_id == agent_id]
         instance = instances[0] if instances else await self.adapter.create(
             RuntimeContext(
@@ -98,6 +100,54 @@ class RuntimeControlService:
             {"name": "debug run", "status": "success", "agent_id": agent_id, "session_id": str(payload.get("session_id") or "debug"), "input_payload": payload, "output_payload": result},
         )
         return {"run_id": run.id, **result}
+
+    def _hydrate_runtime_payload(self, tenant_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        hydrated = dict(payload)
+        try:
+            agent = self.resources.get("agents", tenant_id, agent_id)
+        except Exception:
+            return hydrated
+        agent_config = dict(agent.config or {})
+        agent_spec = dict(agent.spec or {})
+        if not hydrated.get("model_config"):
+            model_config = dict(agent_config.get("model_config") or agent_spec.get("model_config") or {})
+            model_id = str(hydrated.get("model_id") or agent_config.get("model_id") or agent_spec.get("model_id") or "")
+            if model_id:
+                model_config = {**self._model_runtime_config(tenant_id, model_id), **model_config}
+            hydrated["model_config"] = model_config
+        if not hydrated.get("tool_policy"):
+            hydrated["tool_policy"] = dict(agent_config.get("tool_policy") or agent_spec.get("tool_policy") or {})
+        if not hydrated.get("memory_policy"):
+            hydrated["memory_policy"] = dict(agent_config.get("memory_policy") or agent_spec.get("memory_policy") or {})
+        if not hydrated.get("knowledge_bindings"):
+            knowledge_ids = list(agent_config.get("knowledge_base_ids") or agent_spec.get("knowledge_base_ids") or [])
+            hydrated["knowledge_bindings"] = [{"knowledge_base_id": item} for item in knowledge_ids]
+        if not hydrated.get("resource_limits"):
+            hydrated["resource_limits"] = dict(agent_config.get("resource_limits") or agent_spec.get("resource_limits") or {})
+        return hydrated
+
+    def _model_runtime_config(self, tenant_id: str, model_id: str) -> dict[str, Any]:
+        model = self.resources.get("models", tenant_id, model_id)
+        config = dict(model.config or {})
+        provider_type = str(model.provider_type or "")
+        if model.provider_id:
+            provider = self.resources.get("model_providers", tenant_id, model.provider_id)
+            config = {**dict(provider.config or {}), **config}
+            provider_type = provider_type or str(provider.provider_type or "")
+            endpoints, _ = self.resources.list("model_endpoints", tenant_id, 1, 50, {"provider_id": model.provider_id})
+            for endpoint in endpoints:
+                if endpoint.status == "active" and endpoint.enabled:
+                    config = {**config, **dict(endpoint.config or {}), **dict(endpoint.spec or {})}
+                    break
+            credentials, _ = self.resources.list("model_credentials", tenant_id, 1, 50, {"provider_id": model.provider_id})
+            for credential in credentials:
+                if credential.status == "active" and credential.enabled:
+                    config = {**config, **dict(credential.config or {}), **dict(credential.spec or {})}
+                    break
+        config["provider_type"] = provider_type or config.get("provider_type") or "echo_agent_native"
+        config["model_name"] = model.model_id or config.get("model_name") or model.code or model.name
+        config.setdefault("provider_name", config["provider_type"])
+        return config
 
     def list_instances(self, tenant_id: str) -> list[dict[str, Any]]:
         return [self._instance(item) for item in self.adapter.list(tenant_id)]

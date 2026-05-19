@@ -118,12 +118,19 @@ class MultiAgentService:
         messages: list[dict[str, Any]] = []
         final_response = ""
 
-        if topology == "pipeline":
-            final_response = await self._run_pipeline(tenant_id, user_id, team_id, run.id, members, prompt, session_id, messages)
-        elif topology == "mesh":
-            final_response = await self._run_mesh(tenant_id, user_id, team_id, run.id, members, prompt, session_id, max_rounds, messages)
-        else:
-            final_response = await self._run_star(tenant_id, user_id, team_id, run.id, coordinator_id, members, prompt, session_id, max_rounds, messages)
+        try:
+            if topology == "pipeline":
+                final_response = await self._run_pipeline(tenant_id, user_id, team_id, run.id, members, prompt, session_id, messages)
+            elif topology == "mesh":
+                final_response = await self._run_mesh(tenant_id, user_id, team_id, run.id, members, prompt, session_id, max_rounds, messages)
+            else:
+                final_response = await self._run_star(tenant_id, user_id, team_id, run.id, coordinator_id, members, prompt, session_id, max_rounds, messages)
+        except Exception as exc:
+            run_spec = dict(run.spec or {})
+            run_spec["finished_at"] = datetime.now(timezone.utc).isoformat()
+            run_spec["message_count"] = len(messages)
+            self.resources.update("agent_team_runs", tenant_id, user_id, run.id, {"status": "failed", "spec": run_spec, "error_message": str(exc)})
+            raise
 
         run_spec = dict(run.spec or {})
         run_spec["finished_at"] = datetime.now(timezone.utc).isoformat()
@@ -195,12 +202,10 @@ class MultiAgentService:
         return responses[-1] if responses else ""
 
     async def _invoke_agent(self, tenant_id: str, user_id: str, agent_id: str, prompt: str, session_id: str) -> str:
-        try:
-            from app.runtime.service import RuntimeControlService
-            result = await RuntimeControlService(self.db).debug_run(tenant_id, user_id, agent_id, {"prompt": prompt, "session_id": session_id})
-            return str(result.get("response", ""))
-        except Exception as e:
-            return f"[Agent {agent_id}] 处理完成: {prompt[:100]}"
+        from app.services.agent_runner_service import AgentRunnerService
+
+        result = await AgentRunnerService(self.db).run(tenant_id, user_id, agent_id, {"prompt": prompt, "session_id": session_id, "memory_policy": {"write_scope": "team", "shared": True, "include_shared": True}})
+        return str(result.get("response", ""))
 
     def _record_message(self, tenant_id: str, user_id: str, run_id: str, agent_id: str, role: str, content: str, step: int) -> None:
         self.resources.create("agent_team_messages", tenant_id, user_id, {

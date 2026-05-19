@@ -20,6 +20,7 @@ from app.api.v1 import (
     orgs,
     permissions,
     prompt_studio,
+    published,
     roles,
     runtime,
     scheduler,
@@ -58,8 +59,8 @@ for module in [
     multi_agent,
     guardrails,
     prompt_studio,
+    published,
     marketplace,
     scheduler,
 ]:
     api_router.include_router(module.router)
-

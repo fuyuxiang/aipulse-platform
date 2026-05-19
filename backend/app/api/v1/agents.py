@@ -82,6 +82,17 @@ async def debug_run_agent(
     return await AgentService(db).debug_run(tenant_id, user.id, agent_id, dict(payload))
 
 
+@router.post("/agents/{agent_id}/run")
+async def run_agent(
+    agent_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("agents:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await AgentService(db).debug_run(tenant_id, user.id, agent_id, dict(payload))
+
+
 @router.post("/agents/import")
 def import_agent(
     tenant_id: TenantIdDep,

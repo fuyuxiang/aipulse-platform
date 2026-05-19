@@ -223,3 +223,12 @@ def scheduler_stats(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     return SchedulerService(db).get_stats(tenant_id)
+
+
+@router.post("/scheduler/run-due")
+async def run_due_jobs(
+    tenant_id: TenantIdDep,
+    user: User = Depends(require_permission("runtime:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await SchedulerService(db).run_due_jobs(tenant_id, user.id)

@@ -123,6 +123,9 @@ class PromptStudioService:
         if template_id:
             render_result = self.render_template(tenant_id, template_id, variables)
             prompt = render_result["rendered"]
+            if not model_id:
+                template = self.resources.get("prompt_templates", tenant_id, template_id)
+                model_id = str((template.spec or {}).get("default_model_id") or "")
         else:
             prompt = raw_prompt
 
@@ -263,15 +266,21 @@ class PromptStudioService:
         return test
 
     async def _execute_prompt(self, tenant_id: str, user_id: str, prompt: str, model_id: str, parameters: dict[str, Any]) -> str:
-        try:
-            from app.runtime.service import RuntimeControlService
-            result = await RuntimeControlService(self.db).debug_run(
-                tenant_id, user_id, model_id or "default",
-                {"prompt": prompt, "parameters": parameters}
-            )
-            return str(result.get("response", ""))
-        except Exception:
-            return f"[Playground 响应] 针对 Prompt 的模拟回复。输入长度: {len(prompt)} 字符。"
+        if not model_id:
+            from app.core.constants import ErrorCode
+            from app.core.errors import AppError
+
+            raise AppError(ErrorCode.VALIDATION_ERROR, "model_id is required for prompt playground execution", 422)
+        from app.services.model_services import ModelInvocationService
+
+        result = await ModelInvocationService(self.db).invoke(
+            tenant_id,
+            user_id,
+            model_id,
+            "chat_llm",
+            {"messages": [{"role": "user", "content": prompt}], **parameters},
+        )
+        return str((result.get("result") or {}).get("content") or "")
 
     def _render_inline(self, content: str, variables: dict[str, str]) -> str:
         rendered = content

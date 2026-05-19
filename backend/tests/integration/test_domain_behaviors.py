@@ -306,3 +306,113 @@ def test_model_management_capabilities_credentials_health_and_circuit_reset() ->
     circuit = client.post(f"/api/v1/model-circuit-breakers/{model.json()['id']}/reset", headers=auth)
     assert circuit.status_code == 200
     assert circuit.json()["status"] == "closed"
+
+
+def test_published_agent_api_executes_with_api_key() -> None:
+    client = TestClient(app)
+    auth = headers(client)
+    agent = client.post("/api/v1/agents", headers=auth, json={"name": "Published Agent", "code": "published-agent"})
+    assert agent.status_code == 200
+    agent_id = agent.json()["id"]
+    publication = client.post(f"/api/v1/agents/{agent_id}/publish-api", headers=auth, json={"name": "public chat", "rate_limit": {"requests_per_minute": 5, "requests_per_day": 10}})
+    assert publication.status_code == 200
+    api_key = publication.json()["api_key"]
+    called = client.post(f"/api/v1/published/{agent_id}/chat", headers={"X-API-Key": api_key}, json={"message": "hello published api"})
+    assert called.status_code == 200
+    assert called.json()["publication_id"] == publication.json()["id"]
+    assert called.json()["run_id"]
+    assert called.json()["response"]
+    runs = client.get(f"/api/v1/agents/{agent_id}/runs", headers=auth)
+    assert runs.status_code == 200
+    assert any(item["id"] == called.json()["run_id"] and item["input_payload"]["prompt"] == "hello published api" for item in runs.json()["items"])
+
+
+def test_workflow_tool_node_executes_real_tool() -> None:
+    client = TestClient(app)
+    auth = headers(client)
+    tool = client.post("/api/v1/tools", headers=auth, json={"name": "Workflow Calculator", "config": {"type": "calculator"}})
+    assert tool.status_code == 200
+    nodes = [
+        {"id": "start", "type": "start", "label": "Start"},
+        {"id": "tool", "type": "tool", "label": "Tool", "config": {"tool_id": tool.json()["id"], "arguments": {"numbers": [1, 2], "operation": "sum"}}},
+        {"id": "end", "type": "end", "label": "End"},
+    ]
+    workflow = client.post("/api/v1/workflows", headers=auth, json={"name": "Tool Flow", "spec": {"nodes": nodes, "edges": [{"source": "start", "target": "tool"}, {"source": "tool", "target": "end"}]}})
+    assert workflow.status_code == 200
+    run = client.post(f"/api/v1/workflows/{workflow.json()['id']}/run", headers=auth, json={"context": {"input": "calculate"}})
+    assert run.status_code == 200
+    assert run.json()["status"] == "success"
+    assert run.json()["results"]["tool"]["tool"]["output"]["value"] == 3
+
+
+def test_scheduler_run_due_executes_due_job() -> None:
+    client = TestClient(app)
+    auth = headers(client)
+    agent = client.post("/api/v1/agents", headers=auth, json={"name": "Scheduled Agent", "code": "scheduled-agent"})
+    assert agent.status_code == 200
+    job = client.post(
+        "/api/v1/scheduler/jobs",
+        headers=auth,
+        json={"name": "Due Job", "job_type": "interval", "interval_seconds": 60, "target_type": "agent", "target_id": agent.json()["id"], "input_payload": {"prompt": "scheduled hello"}},
+    )
+    assert job.status_code == 200
+    spec = dict(job.json()["spec"])
+    spec["next_run_at"] = "2000-01-01T00:00:00+00:00"
+    updated = client.put(f"/api/v1/scheduler/jobs/{job.json()['id']}", headers=auth, json={"spec": spec})
+    assert updated.status_code == 200
+    due = client.post("/api/v1/scheduler/run-due", headers=auth)
+    assert due.status_code == 200
+    assert due.json()["count"] == 1
+    assert due.json()["executed"][0]["status"] == "completed"
+
+
+def test_agent_run_uses_rag_and_shared_memory_context() -> None:
+    client = TestClient(app)
+    auth = headers(client)
+    models = client.get("/api/v1/models", headers=auth)
+    assert models.status_code == 200
+    chat_model = next(item for item in models.json()["items"] if item["model_type"] == "chat_llm")
+
+    kb = client.post("/api/v1/knowledge-bases", headers=auth, json={"name": "Agent RAG KB", "config": {"embedding_dimensions": 128, "embedding_model_id": chat_model["id"]}})
+    assert kb.status_code == 200
+    doc = client.post(
+        f"/api/v1/knowledge-bases/{kb.json()['id']}/documents",
+        headers=auth,
+        json={"filename": "refunds.md", "content": "Refunds are handled within 30 days after approval."},
+    )
+    assert doc.status_code == 200
+    assert doc.json()["status"] == "indexed"
+
+    remembered = client.post(
+        "/api/v1/memories/remember",
+        headers=auth,
+        json={"content": "Support answers should be concise and in Chinese.", "scope": "tenant", "shared": True, "source": "test"},
+    )
+    assert remembered.status_code == 200
+
+    agent = client.post(
+        "/api/v1/agents",
+        headers=auth,
+        json={
+            "name": "RAG Memory Agent",
+            "code": "rag-memory-agent",
+            "model_type": "chat_llm",
+            "config": {
+                "model_id": chat_model["id"],
+                "system_prompt": "Answer with grounded enterprise support information.",
+                "knowledge_base_ids": [kb.json()["id"]],
+                "memory_policy": {"enabled": True, "include_shared": True, "top_k": 5, "store_interactions": True, "auto_extract": False, "write_scope": "session"},
+            },
+        },
+    )
+    assert agent.status_code == 200
+
+    run = client.post(f"/api/v1/agents/{agent.json()['id']}/run", headers=auth, json={"prompt": "How are refunds handled?", "session_id": "rag-memory-session"})
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["status"] == "success"
+    assert payload["rag"]["total"] >= 1
+    assert "Refunds are handled within 30 days" in payload["rag"]["context_text"]
+    assert payload["memory"]["total"] >= 1
+    assert "concise and in Chinese" in payload["memory"]["context_text"]
+    assert payload["memory_write"]["count"] >= 1

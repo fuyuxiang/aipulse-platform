@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import math
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any, cast
 
+import httpx
 from sqlalchemy.orm import Session
 
 from app.core.constants import MODEL_TYPES, ErrorCode
@@ -40,7 +42,19 @@ class ModelInvocationService:
         if not model.enabled:
             raise AppError(ErrorCode.BUSINESS_ERROR, "model disabled", 409)
         started = time.perf_counter()
-        result = await self._local_invoke(model_type, payload, model.config or {})
+        status = "success"
+        error_message = ""
+        try:
+            context = self._resolve_model_context(tenant_id, model)
+            result = await self._invoke_with_provider(model_type, payload, context)
+        except AppError as exc:
+            status = "failed"
+            error_message = exc.message
+            result = {"error": exc.message, "code": exc.code}
+        except Exception as exc:
+            status = "failed"
+            error_message = str(exc)
+            result = {"error": str(exc)}
         latency_ms = int((time.perf_counter() - started) * 1000)
         usage = result.get("usage", {})
         cost = self._estimate_cost(model.config or {}, usage)
@@ -50,7 +64,7 @@ class ModelInvocationService:
             user_id,
             {
                 "name": f"{model_type} call",
-                "status": "success",
+                "status": status,
                 "model_id": model_id,
                 "model_type": model_type,
                 "provider_id": model.provider_id,
@@ -60,9 +74,173 @@ class ModelInvocationService:
                 "token_usage": usage,
                 "input_payload": self._summarize(payload),
                 "output_payload": self._summarize(result),
+                "error_message": error_message,
             },
         )
+        if status == "success":
+            self.resources.create(
+                "cost_records",
+                tenant_id,
+                user_id,
+                {
+                    "name": f"model cost {model_type}",
+                    "status": "recorded",
+                    "model_id": model_id,
+                    "model_type": model_type,
+                    "provider_id": model.provider_id,
+                    "agent_id": str(payload.get("agent_id") or ""),
+                    "trace_id": current_trace_id(),
+                    "cost": cost,
+                    "token_usage": usage,
+                    "input_payload": {"source": "model_invocation"},
+                    "output_payload": {"latency_ms": latency_ms},
+                },
+            )
+        if status == "failed":
+            raise AppError(ErrorCode.BUSINESS_ERROR, error_message or "model invocation failed", 502)
         return {"model_id": model_id, "model_type": model_type, "latency_ms": latency_ms, "cost": cost, "result": result}
+
+    def _resolve_model_context(self, tenant_id: str, model: Any) -> dict[str, Any]:
+        provider = None
+        provider_config: dict[str, Any] = {}
+        provider_type = str(model.provider_type or "")
+        if model.provider_id:
+            provider = self.resources.get("model_providers", tenant_id, model.provider_id)
+            provider_config = dict(provider.config or {})
+            provider_type = provider_type or str(provider.provider_type or "")
+
+        credential_config: dict[str, Any] = {}
+        endpoint_config: dict[str, Any] = {}
+        if model.provider_id:
+            credentials, _ = self.resources.list("model_credentials", tenant_id, 1, 50, {"provider_id": model.provider_id})
+            for credential in credentials:
+                if credential.status == "active" and credential.enabled:
+                    credential_config = {**dict(credential.config or {}), **dict(credential.spec or {})}
+                    break
+            endpoints, _ = self.resources.list("model_endpoints", tenant_id, 1, 50, {"provider_id": model.provider_id})
+            for endpoint in endpoints:
+                if endpoint.status == "active" and endpoint.enabled:
+                    endpoint_config = {**dict(endpoint.config or {}), **dict(endpoint.spec or {})}
+                    break
+
+        model_config = dict(model.config or {})
+        config = {
+            **provider_config,
+            **endpoint_config,
+            **credential_config,
+            **model_config,
+        }
+        config.setdefault("model_name", model.model_id or model.code or model.name)
+        config.setdefault("provider_type", provider_type or config.get("type") or "echo_agent_native")
+        return {"model": model, "provider": provider, "provider_type": str(config["provider_type"]), "config": config}
+
+    async def _invoke_with_provider(self, model_type: str, payload: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        provider_type = str(context.get("provider_type") or "").lower()
+        config = dict(context.get("config") or {})
+        if provider_type in {"", "echo_agent_native", "aipulse_local", "local"}:
+            return await self._local_invoke(model_type, payload, config)
+        if provider_type in {"openai", "openai_compatible", "azure_openai"} or config.get("api_style") == "openai":
+            return await self._openai_compatible_invoke(model_type, payload, config)
+        if config.get("invoke_url"):
+            return await self._generic_http_invoke(model_type, payload, config)
+        raise AppError(ErrorCode.VALIDATION_ERROR, f"unsupported provider type: {provider_type}", 422)
+
+    async def _openai_compatible_invoke(self, model_type: str, payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        api_key = self._api_key(config)
+        if not api_key:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "model provider api key is required; set api_key_env or OPENAI_API_KEY", 422)
+        base_url = str(config.get("api_base") or config.get("base_url") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+        model_name = str(config.get("model_name") or config.get("model") or "")
+        if not model_name:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "model_name is required", 422)
+        timeout = float(config.get("timeout_seconds") or 120)
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            **dict(config.get("extra_headers") or {}),
+        }
+        if model_type == "embedding":
+            texts = payload.get("texts") or [payload.get("text", "")]
+            body = {"model": model_name, "input": texts}
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(f"{base_url}/embeddings", headers=headers, json=body)
+            response.raise_for_status()
+            data = response.json()
+            usage = self._normalize_usage(dict(data.get("usage") or {}))
+            return {"embeddings": [item.get("embedding", []) for item in data.get("data", [])], "usage": usage, "model": data.get("model", model_name)}
+        if model_type in {"chat_llm", "reasoning_llm", "vision_language"}:
+            messages = payload.get("messages") or [{"role": "user", "content": payload.get("prompt", "")}]
+            body = {
+                "model": model_name,
+                "messages": messages,
+                "temperature": payload.get("temperature", config.get("temperature", 0.7)),
+                "max_tokens": payload.get("max_tokens", config.get("max_tokens", 4096)),
+            }
+            if payload.get("tools"):
+                body["tools"] = payload["tools"]
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(f"{base_url}/chat/completions", headers=headers, json=body)
+            response.raise_for_status()
+            data = response.json()
+            choice = (data.get("choices") or [{}])[0]
+            message = dict(choice.get("message") or {})
+            return {
+                "content": message.get("content", ""),
+                "tool_calls": message.get("tool_calls", []),
+                "finish_reason": choice.get("finish_reason", ""),
+                "usage": self._normalize_usage(dict(data.get("usage") or {})),
+                "model": data.get("model", model_name),
+                "provider_response_id": data.get("id", ""),
+            }
+        if model_type == "moderation":
+            endpoint = str(config.get("moderation_path") or "/moderations")
+            body = {"model": model_name, "input": payload.get("text") or payload.get("input") or ""}
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(f"{base_url}{endpoint}", headers=headers, json=body)
+            response.raise_for_status()
+            data = response.json()
+            result = (data.get("results") or [{}])[0]
+            categories = dict(result.get("categories") or {})
+            return {
+                "allowed": not bool(result.get("flagged")),
+                "risk_labels": [key for key, value in categories.items() if value],
+                "risk_score": max([float(v) for v in dict(result.get("category_scores") or {}).values()] or [0.0]),
+                "usage": self._normalize_usage(dict(data.get("usage") or {})),
+            }
+        if model_type == "rerank" and config.get("rerank_url"):
+            return await self._generic_http_invoke(model_type, payload, {**config, "invoke_url": config["rerank_url"]})
+        raise AppError(ErrorCode.VALIDATION_ERROR, f"provider does not support model type: {model_type}", 422)
+
+    async def _generic_http_invoke(self, model_type: str, payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        url = str(config.get("invoke_url") or "")
+        if not url.startswith(("http://", "https://")):
+            raise AppError(ErrorCode.VALIDATION_ERROR, "invoke_url must be http(s)", 422)
+        headers = dict(config.get("headers") or {})
+        api_key = self._api_key(config)
+        if api_key and config.get("auth_scheme", "bearer") == "bearer":
+            headers.setdefault("Authorization", f"Bearer {api_key}")
+        body = {"model_type": model_type, "model": config.get("model_name"), **payload}
+        async with httpx.AsyncClient(timeout=float(config.get("timeout_seconds") or 120)) as client:
+            response = await client.request(str(config.get("method") or "POST").upper(), url, headers=headers, json=body)
+        response.raise_for_status()
+        if "application/json" in response.headers.get("content-type", ""):
+            data = response.json()
+            return data if isinstance(data, dict) else {"data": data, "usage": {}}
+        return {"content": response.text, "usage": {"output_tokens": len(response.text.split())}}
+
+    @staticmethod
+    def _api_key(config: dict[str, Any]) -> str:
+        env_name = str(config.get("api_key_env") or config.get("secret_env") or "")
+        if env_name:
+            return os.getenv(env_name, "")
+        return str(config.get("api_key") or config.get("secret") or os.getenv("OPENAI_API_KEY") or "")
+
+    @staticmethod
+    def _normalize_usage(usage: dict[str, Any]) -> dict[str, int]:
+        input_tokens = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+        output_tokens = usage.get("output_tokens", usage.get("completion_tokens", 0))
+        total_tokens = usage.get("total_tokens", int(input_tokens or 0) + int(output_tokens or 0))
+        return {"input_tokens": int(input_tokens or 0), "output_tokens": int(output_tokens or 0), "total_tokens": int(total_tokens or 0)}
 
     async def _local_invoke(self, model_type: str, payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
         await asyncio.sleep(0)

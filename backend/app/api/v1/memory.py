@@ -34,6 +34,26 @@ def search_memories(
     return MemoryService(db).search(tenant_id, user.id, dict(payload))
 
 
+@router.post("/memories/remember")
+def remember_memory(
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("memory:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return MemoryService(db).remember(tenant_id, user.id, dict(payload))
+
+
+@router.post("/memories/context")
+def memory_context(
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("memory:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return MemoryService(db).build_context(tenant_id, user.id, dict(payload))
+
+
 @router.post("/memories/extract")
 def extract_memories(
     tenant_id: TenantIdDep,
