@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.api.v1.domain_router import add_crud_routes, add_list_route
 from app.models.core import User
+from app.services.cost_analytics_service import CostAnalyticsService
 from app.services.resource_service import ResourceService
 
 router = APIRouter(tags=["observability"])
@@ -66,3 +67,96 @@ for path, table in [
     ("/alert-events", "alert_events"),
 ]:
     add_list_route(router, method="get", path=path, table=table, permission="observability")
+
+
+# --- Cost Analytics ---
+
+@router.post("/cost/record")
+def record_cost(
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("observability:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return CostAnalyticsService(db).record_cost(tenant_id, user.id, dict(payload))
+
+
+@router.get("/cost/summary")
+def cost_summary(
+    tenant_id: TenantIdDep,
+    agent_id: str = "",
+    model_id: str = "",
+    _: User = Depends(require_permission("observability:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    filters: dict[str, object] = {}
+    if agent_id:
+        filters["agent_id"] = agent_id
+    if model_id:
+        filters["model_id"] = model_id
+    return CostAnalyticsService(db).get_summary(tenant_id, filters or None)
+
+
+@router.get("/cost/agents/{agent_id}")
+def agent_cost(
+    agent_id: str,
+    tenant_id: TenantIdDep,
+    _: User = Depends(require_permission("observability:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return CostAnalyticsService(db).get_agent_cost(tenant_id, agent_id)
+
+
+@router.post("/cost/budgets")
+def create_budget(
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("observability:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return CostAnalyticsService(db).create_budget(tenant_id, user.id, dict(payload))
+
+
+@router.get("/cost/budgets")
+def list_budgets(
+    tenant_id: TenantIdDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: User = Depends(require_permission("observability:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    items, total = CostAnalyticsService(db).list_budgets(tenant_id, page, page_size)
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.put("/cost/budgets/{budget_id}")
+def update_budget(
+    budget_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("observability:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return CostAnalyticsService(db).update_budget(tenant_id, user.id, budget_id, dict(payload))
+
+
+@router.delete("/cost/budgets/{budget_id}")
+def delete_budget(
+    budget_id: str,
+    tenant_id: TenantIdDep,
+    user: User = Depends(require_permission("observability:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    return CostAnalyticsService(db).delete_budget(tenant_id, user.id, budget_id)
+
+
+@router.get("/cost/alerts")
+def list_cost_alerts(
+    tenant_id: TenantIdDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: User = Depends(require_permission("observability:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    items, total = CostAnalyticsService(db).list_cost_alerts(tenant_id, page, page_size)
+    return {"items": items, "total": total, "page": page, "page_size": page_size}

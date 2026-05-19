@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections import defaultdict, deque
 from typing import Any, Awaitable, Callable
 
@@ -16,6 +15,7 @@ class WorkflowExecutor:
             raise WorkflowValidationError("workflow requires at least one node")
         graph: dict[str, list[str]] = defaultdict(list)
         indegree = {node_id: 0 for node_id in node_ids}
+        outgoing = {node_id: 0 for node_id in node_ids}
         for edge in edges:
             source = str(edge["source"])
             target = str(edge["target"])
@@ -23,6 +23,11 @@ class WorkflowExecutor:
                 raise WorkflowValidationError("edge references unknown node")
             graph[source].append(target)
             indegree[target] += 1
+            outgoing[source] += 1
+        if len(node_ids) > 1:
+            isolated = [node_id for node_id in node_ids if indegree[node_id] == 0 and outgoing[node_id] == 0]
+            if isolated:
+                raise WorkflowValidationError(f"workflow contains isolated nodes: {', '.join(sorted(isolated))}")
         queue = deque([node_id for node_id, degree in indegree.items() if degree == 0])
         ordered: list[str] = []
         while queue:
@@ -56,4 +61,3 @@ class WorkflowExecutor:
             results[node_id] = await handler(node, context)
             context[node_id] = results[node_id]
         return {"status": "success", "results": results, "context": context}
-

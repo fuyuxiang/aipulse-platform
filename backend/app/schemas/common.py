@@ -26,10 +26,16 @@ class ResourceCreate(BaseModel):
     user_id: str = ""
     knowledge_base_id: str = ""
     tool_name: str = ""
+    latency_ms: int = 0
+    cost: float = 0.0
+    token_usage: dict[str, Any] = Field(default_factory=dict)
     config: dict[str, Any] = Field(default_factory=dict)
     spec: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     input_payload: dict[str, Any] = Field(default_factory=dict)
+    output_payload: dict[str, Any] = Field(default_factory=dict)
+    error_code: str = ""
+    error_message: str = ""
 
 
 class ResourceUpdate(BaseModel):
@@ -52,10 +58,16 @@ class ResourceUpdate(BaseModel):
     user_id: str | None = None
     knowledge_base_id: str | None = None
     tool_name: str | None = None
+    latency_ms: int | None = None
+    cost: float | None = None
+    token_usage: dict[str, Any] | None = None
     config: dict[str, Any] | None = None
     spec: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
     input_payload: dict[str, Any] | None = None
+    output_payload: dict[str, Any] | None = None
+    error_code: str | None = None
+    error_message: str | None = None
 
 
 class ResourceRead(BaseModel):
@@ -111,4 +123,3 @@ class ActionResponse(BaseModel):
     resource_type: str
     resource_id: str = ""
     output: dict[str, Any] = Field(default_factory=dict)
-

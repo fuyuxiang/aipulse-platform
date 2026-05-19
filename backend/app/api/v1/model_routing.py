@@ -19,7 +19,6 @@ for method, path, table, action, output in [
     ("delete", "/model-route-rules/{rule_id}", "model_route_rules", "delete_rule", None),
     ("post", "/model-routing-policies/{policy_id}/fallback-chain", "model_routing_policies", "fallback_chain", "model_fallback_chains"),
     ("get", "/model-routing-policies/{policy_id}/fallback-chain", "model_fallback_chains", "fallback_chain", None),
-    ("post", "/model-circuit-breakers/{model_id}/reset", "model_circuit_breaker_states", "reset", None),
 ]:
     if method == "get":
         add_list_route(router, method=method, path=path, table=table, permission="model-routing")
@@ -36,6 +35,11 @@ def route_model(tenant_id: TenantIdDep, payload: dict[str, object] = Body(defaul
 async def invoke_model(tenant_id: TenantIdDep, payload: dict[str, object] = Body(default_factory=dict), user: User = Depends(require_permission("model-routing:write")), db: Session = Depends(get_db)) -> dict[str, object]:
     route = ModelRoutingService(db).route(tenant_id, user.id, dict(payload))
     return await ModelInvocationService(db).invoke(tenant_id, user.id, str(route["model_id"]), str(route["model_type"]), dict(payload))
+
+
+@router.post("/model-circuit-breakers/{model_id}/reset")
+def reset_model_circuit_breaker(model_id: str, tenant_id: TenantIdDep, user: User = Depends(require_permission("model-routing:write")), db: Session = Depends(get_db)) -> dict[str, object]:
+    return ModelRoutingService(db).reset_circuit_breaker(tenant_id, user.id, model_id)
 
 
 for path, table in [

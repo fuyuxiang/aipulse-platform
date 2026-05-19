@@ -45,6 +45,15 @@ export const api = {
   create: (path: string, payload: Partial<ResourceRecord>) => request<ResourceRecord>(path, { method: 'POST', body: JSON.stringify(payload) }),
   update: (path: string, id: string, payload: Partial<ResourceRecord>) => request<ResourceRecord>(`${path}/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   remove: (path: string, id: string) => request<Record<string, string>>(`${path}/${id}`, { method: 'DELETE' }),
-  action: (path: string, payload: Record<string, unknown>) => request<Record<string, unknown>>(path, { method: 'POST', body: JSON.stringify({ payload }) })
+  post: <T = Record<string, unknown>>(path: string, payload: Record<string, unknown>) => request<T>(path, { method: 'POST', body: JSON.stringify(payload) }),
+  action: (path: string, payload: Record<string, unknown>) => request<Record<string, unknown>>(path, { method: 'POST', body: JSON.stringify({ payload }) }),
+  get: <T = Record<string, unknown>>(path: string) => request<T>(path),
 };
 
+export function streamFetch(path: string, payload: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
+  const headers = new Headers();
+  headers.set('Content-Type', 'application/json');
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return fetch(`${API_PREFIX}${path}`, { method: 'POST', headers, body: JSON.stringify(payload), signal });
+}
