@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass
@@ -28,4 +27,3 @@ class ApprovalWaiter:
         future = self._events.setdefault(decision.approval_id, asyncio.get_running_loop().create_future())
         if not future.done():
             future.set_result(decision)
-

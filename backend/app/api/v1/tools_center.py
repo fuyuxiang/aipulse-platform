@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body, Depends
+from sqlalchemy.orm import Session
 
+from app.api.deps import TenantIdDep, get_db, require_permission
 from app.api.v1.domain_router import add_action_route, add_crud_routes, add_list_route
+from app.models.core import User
+from app.services.tool_service import ToolService
 
 router = APIRouter(tags=["tools-center"])
 
@@ -19,12 +23,8 @@ for method, path, table, action, output in [
     ("get", "/tools/{tool_id}/versions", "tool_versions", "versions", None),
     ("post", "/tools/{tool_id}/permissions", "tools", "permissions", "tool_permissions"),
     ("get", "/tools/{tool_id}/permissions", "tool_permissions", "permissions", None),
-    ("post", "/tools/{tool_id}/invoke", "tools", "invoke", "tool_call_logs"),
     ("get", "/tool-call-logs", "tool_call_logs", "logs", None),
     ("get", "/tool-approval-tasks", "tool_approval_tasks", "approvals", None),
-    ("post", "/tool-approval-tasks/{approval_id}/approve", "tool_approval_tasks", "approve", "tool_call_logs"),
-    ("post", "/tool-approval-tasks/{approval_id}/reject", "tool_approval_tasks", "reject", "tool_call_logs"),
-    ("post", "/mcp-servers/{server_id}/sync-tools", "mcp_servers", "sync_tools", "mcp_tools"),
     ("get", "/mcp-servers/{server_id}/tools", "mcp_tools", "mcp_tools", None),
 ]:
     if method == "get":
@@ -32,3 +32,46 @@ for method, path, table, action, output in [
     else:
         add_action_route(router, method=method, path=path, table=table, permission="tools", action=action, output_table=output)
 
+
+@router.post("/tools/{tool_id}/invoke")
+async def invoke_tool(
+    tool_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("tools:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await ToolService(db).invoke(tenant_id, user.id, tool_id, dict(payload))
+
+
+@router.post("/tool-approval-tasks/{approval_id}/approve")
+def approve_tool(
+    approval_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("tools:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return ToolService(db).approve_task(tenant_id, user.id, approval_id, True, dict(payload))
+
+
+@router.post("/tool-approval-tasks/{approval_id}/reject")
+def reject_tool(
+    approval_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("tools:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return ToolService(db).approve_task(tenant_id, user.id, approval_id, False, dict(payload))
+
+
+@router.post("/mcp-servers/{server_id}/sync-tools")
+def sync_mcp_tools(
+    server_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("tools:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return ToolService(db).sync_mcp_tools(tenant_id, user.id, server_id, dict(payload))

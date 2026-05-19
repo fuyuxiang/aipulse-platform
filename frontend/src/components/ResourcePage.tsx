@@ -8,6 +8,7 @@ import type { PageConfig, ResourceRecord } from '../models/types';
 import { api } from '../services/http';
 import { WorkflowDesigner } from '../workflow-designer/WorkflowDesigner';
 import { AgentWizard } from '../agent-designer/AgentWizard';
+import { FeatureWorkbench } from './FeatureWorkbench';
 
 interface Props {
   page: PageConfig;
@@ -83,6 +84,7 @@ export function ResourcePage({ page }: Props): JSX.Element {
       </div>
       {page.designer === 'workflow' ? <WorkflowDesigner /> : null}
       {page.designer === 'agent' ? <AgentWizard /> : null}
+      <FeatureWorkbench page={page} rows={rows} onChanged={() => load()} />
       <Table<ResourceRecord>
         rowKey="id"
         columns={columns}
@@ -106,4 +108,3 @@ export function ResourcePage({ page }: Props): JSX.Element {
     </div>
   );
 }
-

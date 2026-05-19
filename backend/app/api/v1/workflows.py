@@ -1,8 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Body, Depends, Query, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
 
-from app.api.v1.domain_router import add_action_route, add_crud_routes, add_list_route
+from app.api.deps import TenantIdDep, get_db, require_permission
+from app.api.v1.domain_router import add_crud_routes, add_list_route
+from app.core.response import ListResponse
+from app.models.core import User
+from app.schemas.common import ResourceRead
+from app.services.resource_service import ResourceService
+from app.services.workflow_service import WorkflowService
 from app.websocket.manager import websocket_manager
 
 router = APIRouter(tags=["workflows"])
@@ -10,27 +17,157 @@ router = APIRouter(tags=["workflows"])
 add_crud_routes(router, table="workflow_definitions", prefix="/workflows", permission="workflows")
 add_crud_routes(router, table="workflow_templates", prefix="/workflow-templates", permission="workflows")
 
-for method, path, table, action, output in [
-    ("post", "/workflows/{workflow_id}/versions", "workflow_definitions", "create_version", "workflow_versions"),
-    ("get", "/workflows/{workflow_id}/versions", "workflow_versions", "versions", None),
-    ("post", "/workflows/{workflow_id}/validate", "workflow_definitions", "validate", "workflow_run_events"),
-    ("post", "/workflows/{workflow_id}/publish", "workflow_definitions", "publish", "workflow_versions"),
-    ("post", "/workflows/{workflow_id}/run", "workflow_definitions", "run", "workflow_runs"),
-    ("get", "/workflows/{workflow_id}/runs", "workflow_runs", "runs", None),
-    ("get", "/workflow-runs/{run_id}", "workflow_runs", "run", None),
-    ("get", "/workflow-runs/{run_id}/steps", "workflow_run_steps", "steps", None),
-    ("get", "/workflow-runs/{run_id}/logs", "workflow_run_logs", "logs", None),
-    ("post", "/workflow-runs/{run_id}/retry", "workflow_runs", "retry", "workflow_run_events"),
-    ("post", "/workflow-runs/{run_id}/cancel", "workflow_runs", "cancel", "workflow_run_events"),
-    ("post", "/workflow-runs/{run_id}/replay", "workflow_runs", "replay", "workflow_run_events"),
-    ("get", "/workflow-approvals", "workflow_approvals", "approvals", None),
-    ("post", "/workflow-approvals/{approval_id}/approve", "workflow_approvals", "approve", "workflow_run_events"),
-    ("post", "/workflow-approvals/{approval_id}/reject", "workflow_approvals", "reject", "workflow_run_events"),
-]:
-    if method == "get":
-        add_list_route(router, method=method, path=path, table=table, permission="workflows")
-    else:
-        add_action_route(router, method=method, path=path, table=table, permission="workflows", action=action, output_table=output)
+@router.post("/workflows/{workflow_id}/versions")
+def create_workflow_version(
+    workflow_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return WorkflowService(db).create_version(tenant_id, user.id, workflow_id, dict(payload))
+
+
+@router.get("/workflows/{workflow_id}/versions", response_model=ListResponse[ResourceRead])
+def workflow_versions(
+    workflow_id: str,
+    tenant_id: TenantIdDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: User = Depends(require_permission("workflows:read")),
+    db: Session = Depends(get_db),
+) -> ListResponse[ResourceRead]:
+    rows, total = ResourceService(db).list("workflow_versions", tenant_id, page, page_size, {"parent_id": workflow_id})
+    return ListResponse(items=[ResourceRead.model_validate(ResourceService.to_dict(row)) for row in rows], total=total, page=page, page_size=page_size)
+
+
+@router.post("/workflows/{workflow_id}/validate")
+def validate_workflow(
+    workflow_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return WorkflowService(db).validate(tenant_id, user.id, workflow_id, dict(payload))
+
+
+@router.post("/workflows/{workflow_id}/publish")
+def publish_workflow(
+    workflow_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return WorkflowService(db).publish(tenant_id, user.id, workflow_id, dict(payload))
+
+
+@router.post("/workflows/{workflow_id}/run")
+async def run_workflow(
+    workflow_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await WorkflowService(db).run(tenant_id, user.id, workflow_id, dict(payload))
+
+
+@router.get("/workflows/{workflow_id}/runs", response_model=ListResponse[ResourceRead])
+def workflow_runs(
+    workflow_id: str,
+    tenant_id: TenantIdDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: User = Depends(require_permission("workflows:read")),
+    db: Session = Depends(get_db),
+) -> ListResponse[ResourceRead]:
+    rows, total = ResourceService(db).list("workflow_runs", tenant_id, page, page_size, {"workflow_id": workflow_id})
+    return ListResponse(items=[ResourceRead.model_validate(ResourceService.to_dict(row)) for row in rows], total=total, page=page, page_size=page_size)
+
+
+@router.get("/workflow-runs/{run_id}", response_model=ResourceRead)
+def workflow_run(run_id: str, tenant_id: TenantIdDep, _: User = Depends(require_permission("workflows:read")), db: Session = Depends(get_db)) -> ResourceRead:
+    return ResourceRead.model_validate(ResourceService.to_dict(ResourceService(db).get("workflow_runs", tenant_id, run_id)))
+
+
+@router.get("/workflow-runs/{run_id}/steps", response_model=ListResponse[ResourceRead])
+def workflow_run_steps(
+    run_id: str,
+    tenant_id: TenantIdDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: User = Depends(require_permission("workflows:read")),
+    db: Session = Depends(get_db),
+) -> ListResponse[ResourceRead]:
+    rows, total = ResourceService(db).list("workflow_run_steps", tenant_id, page, page_size, {"run_id": run_id})
+    return ListResponse(items=[ResourceRead.model_validate(ResourceService.to_dict(row)) for row in rows], total=total, page=page, page_size=page_size)
+
+
+@router.get("/workflow-runs/{run_id}/logs", response_model=ListResponse[ResourceRead])
+def workflow_run_logs(
+    run_id: str,
+    tenant_id: TenantIdDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: User = Depends(require_permission("workflows:read")),
+    db: Session = Depends(get_db),
+) -> ListResponse[ResourceRead]:
+    rows, total = ResourceService(db).list("workflow_run_logs", tenant_id, page, page_size, {"run_id": run_id})
+    return ListResponse(items=[ResourceRead.model_validate(ResourceService.to_dict(row)) for row in rows], total=total, page=page, page_size=page_size)
+
+
+@router.post("/workflow-runs/{run_id}/retry")
+async def retry_workflow_run(
+    run_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await WorkflowService(db).retry(tenant_id, user.id, run_id, dict(payload))
+
+
+@router.post("/workflow-runs/{run_id}/cancel")
+def cancel_workflow_run(
+    run_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return WorkflowService(db).cancel(tenant_id, user.id, run_id, dict(payload))
+
+
+@router.post("/workflow-runs/{run_id}/replay")
+def replay_workflow_run(run_id: str, tenant_id: TenantIdDep, user: User = Depends(require_permission("workflows:write")), db: Session = Depends(get_db)) -> dict[str, object]:
+    return WorkflowService(db).replay(tenant_id, user.id, run_id)
+
+
+add_list_route(router, method="get", path="/workflow-approvals", table="workflow_approvals", permission="workflows")
+
+
+@router.post("/workflow-approvals/{approval_id}/approve")
+def approve_workflow(
+    approval_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return WorkflowService(db).decide_approval(tenant_id, user.id, approval_id, True, dict(payload))
+
+
+@router.post("/workflow-approvals/{approval_id}/reject")
+def reject_workflow(
+    approval_id: str,
+    tenant_id: TenantIdDep,
+    payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("workflows:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return WorkflowService(db).decide_approval(tenant_id, user.id, approval_id, False, dict(payload))
 
 
 @router.websocket("/ws/workflow-runs/{run_id}")
@@ -41,4 +178,3 @@ async def workflow_ws(websocket: WebSocket, run_id: str) -> None:
             await websocket.receive_text()
     except WebSocketDisconnect:
         websocket_manager.disconnect(run_id, websocket)
-

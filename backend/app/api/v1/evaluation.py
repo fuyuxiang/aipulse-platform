@@ -19,8 +19,6 @@ for method, path, table, action, output in [
     ("get", "/evaluation/runs", "evaluation_runs", "runs", None),
     ("get", "/evaluation/runs/{run_id}", "evaluation_runs", "run", None),
     ("get", "/evaluation/runs/{run_id}/results", "evaluation_results", "results", None),
-    ("post", "/evaluation/prompt-compare", "prompt_comparison_runs", "prompt_compare", "prompt_comparison_runs"),
-    ("post", "/evaluation/regression", "regression_runs", "regression", "regression_runs"),
     ("put", "/bad-cases/{bad_case_id}/label", "bad_cases", "label", None),
 ]:
     if method == "get":
@@ -32,3 +30,13 @@ for method, path, table, action, output in [
 @router.post("/evaluation/runs")
 def run_evaluation(tenant_id: TenantIdDep, payload: dict[str, object] = Body(default_factory=dict), user: User = Depends(require_permission("evaluation:write")), db: Session = Depends(get_db)) -> dict[str, object]:
     return EvaluationService(db).run(tenant_id, user.id, dict(payload))
+
+
+@router.post("/evaluation/prompt-compare")
+def prompt_compare(tenant_id: TenantIdDep, payload: dict[str, object] = Body(default_factory=dict), user: User = Depends(require_permission("evaluation:write")), db: Session = Depends(get_db)) -> dict[str, object]:
+    return EvaluationService(db).prompt_compare(tenant_id, user.id, dict(payload))
+
+
+@router.post("/evaluation/regression")
+def regression(tenant_id: TenantIdDep, payload: dict[str, object] = Body(default_factory=dict), user: User = Depends(require_permission("evaluation:write")), db: Session = Depends(get_db)) -> dict[str, object]:
+    return EvaluationService(db).regression(tenant_id, user.id, dict(payload))

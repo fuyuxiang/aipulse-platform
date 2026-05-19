@@ -2,6 +2,7 @@ import type { PageConfig } from '../models/types';
 
 const pages: Array<[string, string, string, string, PageConfig['designer']?]> = [
   ['/dashboard', '首页运行大盘', '/observability/dashboard', '首页'],
+  ['/chat', '对话', '/chat/sessions', '对话'],
   ['/tenants', '租户管理', '/tenants', '身份与权限'],
   ['/users', '用户管理', '/users', '身份与权限'],
   ['/organizations', '组织管理', '/orgs', '身份与权限'],
@@ -105,6 +106,28 @@ const pages: Array<[string, string, string, string, PageConfig['designer']?]> = 
   ['/security/ip', 'IP 白名单页', '/security/ip-allowlists', '安全'],
   ['/security/rate-limit', 'API 限流页', '/security/rate-limit-rules', '安全'],
   ['/security/events', '安全事件页', '/security/events', '安全'],
+  ['/multi-agent', 'Multi-Agent 协作', '/agent-teams', 'Multi-Agent'],
+  ['/multi-agent/teams', 'Agent 团队管理', '/agent-teams', 'Multi-Agent'],
+  ['/multi-agent/runs', '团队执行记录', '/agent-teams', 'Multi-Agent'],
+  ['/guardrails', '护栏策略', '/guardrails/policies', '护栏'],
+  ['/guardrails/violations', '违规记录', '/guardrails/violations', '护栏'],
+  ['/guardrails/test', '护栏测试', '/guardrails/check-input', '护栏'],
+  ['/prompt-studio', 'Prompt 工作台', '/prompt-templates', 'Prompt'],
+  ['/prompt-studio/playground', 'Playground', '/prompt-playground/run', 'Prompt'],
+  ['/prompt-studio/ab-tests', 'A/B 测试', '/prompt-ab-tests', 'Prompt'],
+  ['/marketplace', 'Agent 市场', '/marketplace/listings', '市场'],
+  ['/marketplace/installs', '已安装', '/marketplace/installs', '市场'],
+  ['/marketplace/publish', '发布管理', '/marketplace/listings', '市场'],
+  ['/scheduler', '调度中心', '/scheduler/jobs', '调度'],
+  ['/scheduler/webhooks', 'Webhooks', '/scheduler/webhooks', '调度'],
+  ['/scheduler/triggers', '事件触发器', '/scheduler/triggers', '调度'],
+  ['/cost-analytics', '成本分析', '/cost/summary', '成本'],
+  ['/cost-analytics/budgets', '预算管理', '/cost/budgets', '成本'],
+  ['/cost-analytics/alerts', '成本告警', '/cost/alerts', '成本'],
+  ['/trace-visualization', 'Trace 瀑布图', '/observability/traces', '可观测'],
+  ['/agents/publish', 'Agent 发布管理', '/agent-publications', 'Agent'],
+  ['/agents/widgets', 'Agent Widget', '/agent-widgets', 'Agent'],
+  ['/agents/channels', '渠道接入', '/agent-channels', 'Agent'],
   ['/system', '系统配置页', '/system/configs', '系统']
 ];
 

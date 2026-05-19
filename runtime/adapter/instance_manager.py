@@ -3,14 +3,12 @@ from __future__ import annotations
 import asyncio
 import uuid
 from pathlib import Path
-from typing import Any
 
 from runtime.adapter.config_bridge import ConfigBridge
 from runtime.adapter.knowledge_bridge import KnowledgeBridge
 from runtime.adapter.lifecycle import RuntimeContext, RuntimeInstance
 from runtime.adapter.memory_bridge import MemoryBridge
 from runtime.adapter.model_bridge import ModelBridge
-from runtime.adapter.session_bridge import SessionBridge
 from runtime.adapter.tool_policy_bridge import ToolPolicyBridge
 
 
@@ -93,4 +91,3 @@ class InstanceManager:
     def list(self, tenant_id: str | None = None) -> list[RuntimeInstance]:
         rows = list(self.instances.values())
         return [row for row in rows if tenant_id is None or row.context.tenant_id == tenant_id]
-
