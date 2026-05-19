@@ -28,16 +28,16 @@ function operationsFor(page: PageConfig): Operation[] {
   if (page.api === '/agents') {
     return [
       { key: 'version', label: '创建版本', needsResource: true, buildPath: (id) => `/agents/${id}/versions` },
-      { key: 'release', label: '发布 Agent', needsResource: true, buildPath: (id) => `/agents/${id}/release` },
+      { key: 'release', label: '发布', needsResource: true, buildPath: (id) => `/agents/${id}/release` },
       { key: 'gray-release', label: '灰度发布', needsResource: true, buildPath: (id) => `/agents/${id}/gray-release` },
       { key: 'rollback', label: '回滚', needsResource: true, buildPath: (id) => `/agents/${id}/rollback` },
-      { key: 'debug-run', label: '调试运行', needsResource: true, buildPath: (id) => `/agents/${id}/debug-run` }
+      { key: 'debug-run', label: '试运行', needsResource: true, buildPath: (id) => `/agents/${id}/debug-run` }
     ];
   }
   if (page.api === '/workflows') {
     return [
-      { key: 'validate', label: 'DAG 校验', needsResource: true, buildPath: (id) => `/workflows/${id}/validate` },
-      { key: 'run', label: '执行 Workflow', needsResource: true, buildPath: (id) => `/workflows/${id}/run` },
+      { key: 'validate', label: '校验', needsResource: true, buildPath: (id) => `/workflows/${id}/validate` },
+      { key: 'run', label: '执行', needsResource: true, buildPath: (id) => `/workflows/${id}/run` },
       { key: 'publish', label: '发布版本', needsResource: true, buildPath: (id) => `/workflows/${id}/publish` }
     ];
   }
@@ -54,15 +54,15 @@ function operationsFor(page: PageConfig): Operation[] {
     return [
       { key: 'version', label: '创建模型版本', needsResource: true, buildPath: (id) => `/models/${id}/versions` },
       { key: 'health', label: '健康检查', needsResource: true, buildPath: (id) => `/models/${id}/health-check` },
-      { key: 'reset-circuit', label: '熔断重置', needsResource: true, buildPath: (id) => `/model-circuit-breakers/${id}/reset` },
-      { key: 'test-chat', label: '对话测试', needsResource: true, buildPath: (id) => `/models/${id}/test-chat` },
-      { key: 'test-embedding', label: 'Embedding 测试', needsResource: true, buildPath: (id) => `/models/${id}/test-embedding` },
-      { key: 'test-rerank', label: 'Rerank 测试', needsResource: true, buildPath: (id) => `/models/${id}/test-rerank` },
-      { key: 'test-moderation', label: '审核测试', needsResource: true, buildPath: (id) => `/models/${id}/test-moderation` }
+      { key: 'reset-circuit', label: '重置熔断', needsResource: true, buildPath: (id) => `/model-circuit-breakers/${id}/reset` },
+      { key: 'test-chat', label: '对话验证', needsResource: true, buildPath: (id) => `/models/${id}/test-chat` },
+      { key: 'test-embedding', label: '向量化验证', needsResource: true, buildPath: (id) => `/models/${id}/test-embedding` },
+      { key: 'test-rerank', label: '重排序验证', needsResource: true, buildPath: (id) => `/models/${id}/test-rerank` },
+      { key: 'test-moderation', label: '内容审核验证', needsResource: true, buildPath: (id) => `/models/${id}/test-moderation` }
     ];
   }
   if (page.api === '/model-credentials') {
-    return [{ key: 'credential-test', label: '凭证测试', needsResource: true, buildPath: (id) => `/model-credentials/${id}/test` }];
+    return [{ key: 'credential-test', label: '凭证验证', needsResource: true, buildPath: (id) => `/model-credentials/${id}/test` }];
   }
   if (page.api === '/model-routing-policies') {
     return [
@@ -127,10 +127,10 @@ export function FeatureWorkbench({ page, rows, onChanged }: Props): JSX.Element 
       title={
         <Space>
           <ThunderboltOutlined />
-          <span>领域操作台</span>
+          <span>操作台</span>
         </Space>
       }
-      extra={<Tag color="processing">{operations.length} 项能力</Tag>}
+      extra={<Tag color="processing">{operations.length} 项操作</Tag>}
     >
       <Space direction="vertical" className="w-full" size="middle">
         <Form layout="vertical">

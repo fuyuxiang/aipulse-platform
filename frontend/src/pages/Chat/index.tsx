@@ -387,7 +387,7 @@ export function ChatPage(): JSX.Element {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onPressEnter={(e) => { if (!e.shiftKey) { e.preventDefault(); void sendMessage(); } }}
-                  placeholder="输入消息，Shift+Enter 换行..."
+                  placeholder="输入消息..."
                   autoSize={{ minRows: 1, maxRows: 4 }}
                   disabled={streaming}
                   className="flex-1"
@@ -404,7 +404,7 @@ export function ChatPage(): JSX.Element {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <Empty description="选择或创建一个对话开始聊天" />
+            <Empty description="选择或新建对话" />
           </div>
         )}
       </div>

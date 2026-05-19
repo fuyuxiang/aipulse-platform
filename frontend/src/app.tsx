@@ -62,10 +62,10 @@ export function App(): JSX.Element {
         menuItemRender={(item, dom) => <Link to={item.path || '/dashboard'}>{dom}</Link>}
         menuFooterRender={() => (
           <div className="menu-runtime-card">
-            <div className="menu-runtime-title">Agent Runtime</div>
+            <div className="menu-runtime-title">AIPulse AgentOS</div>
             <div className="menu-runtime-meta">
-              <span>生产运行控制面</span>
-              <span>v0.1</span>
+              <span>智能体基础设施平台</span>
+              <span>v1.0</span>
             </div>
           </div>
         )}

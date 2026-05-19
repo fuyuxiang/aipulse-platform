@@ -56,10 +56,10 @@ export function LoginPage(): JSX.Element {
         title={
           <Space direction="vertical" size={2}>
             <Typography.Text strong>登录控制台</Typography.Text>
-            <Typography.Text type="secondary">Tenant Console Access</Typography.Text>
+            <Typography.Text type="secondary">智能体基础设施平台</Typography.Text>
           </Space>
         }
-        extra={<Tag color="processing">Enterprise</Tag>}
+        extra={<Tag color="processing">企业版</Tag>}
       >
         <Form layout="vertical" initialValues={{ tenant: 'default', username: 'admin' }} onFinish={(values) => void submit(values)}>
           <Form.Item name="tenant" label="租户" rules={[{ required: true }]}>

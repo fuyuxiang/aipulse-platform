@@ -35,7 +35,7 @@ interface AssetRow {
   name: string;
   source: string;
   count: number;
-  status: '已接入' | '待确认';
+  status: '正常' | '未接入';
 }
 
 interface RuntimeSignal {
@@ -45,12 +45,12 @@ interface RuntimeSignal {
 }
 
 const SUMMARY_LABELS: Record<string, string> = {
-  agents: 'Agent 资产',
-  agent_runs: 'Agent 运行记录',
-  workflow_runs: 'Workflow 运行记录',
-  model_calls: '模型调用日志',
-  tool_calls: '工具调用日志',
-  rag_retrievals: 'RAG 检索日志',
+  agents: '智能体',
+  agent_runs: '运行记录',
+  workflow_runs: '工作流执行',
+  model_calls: '模型调用',
+  tool_calls: '工具调用',
+  rag_retrievals: '知识检索',
   alerts: '告警事件',
   bad_cases: '质量缺陷',
 };
@@ -68,17 +68,14 @@ const ASSET_SOURCES: Array<[keyof typeof SUMMARY_LABELS, string]> = [
 
 const assetColumns: ColumnsType<AssetRow> = [
   {
-    title: '生产数据域',
+    title: '数据类别',
     dataIndex: 'name',
-    render: (value: string, row) => (
-      <Space direction="vertical" size={0}>
-        <Typography.Text strong>{value}</Typography.Text>
-        <Typography.Text type="secondary" className="text-xs">来源表：{row.source}</Typography.Text>
-      </Space>
+    render: (value: string) => (
+      <Typography.Text strong>{value}</Typography.Text>
     ),
   },
   { title: '记录数', dataIndex: 'count', width: 140, render: (value: number) => <Typography.Text strong>{value}</Typography.Text> },
-  { title: '接入状态', dataIndex: 'status', width: 140, render: (value: string) => <Tag color={value === '已接入' ? 'success' : 'default'}>{value}</Tag> },
+  { title: '状态', dataIndex: 'status', width: 140, render: (value: string) => <Tag color={value === '正常' ? 'success' : 'default'}>{value}</Tag> },
 ];
 
 function metricValue(summary: Record<string, number>, key: string): number {
@@ -140,29 +137,29 @@ export function DashboardPage(): JSX.Element {
   const metricCards = [
     {
       key: 'agents',
-      title: 'Agent 资产',
-      description: '来自 agents',
+      title: '智能体',
+      description: '已注册智能体总数',
       icon: <DeploymentUnitOutlined />,
       tone: 'blue',
     },
     {
       key: 'agent_runs',
-      title: 'Agent 运行记录',
-      description: '来自 agent_run_records',
+      title: '运行记录',
+      description: '智能体执行次数',
       icon: <NodeIndexOutlined />,
       tone: 'green',
     },
     {
       key: 'workflow_runs',
-      title: 'Workflow 运行记录',
-      description: '来自 workflow_runs',
+      title: '工作流执行',
+      description: '工作流运行次数',
       icon: <BarChartOutlined />,
       tone: 'amber',
     },
     {
       key: 'alerts',
       title: '告警事件',
-      description: '来自 alert_events',
+      description: '待处理告警数',
       icon: <SafetyCertificateOutlined />,
       tone: 'red',
     },
@@ -175,24 +172,24 @@ export function DashboardPage(): JSX.Element {
         name: formatSummaryLabel(key),
         source,
         count: metricValue(summary, key),
-        status: dashboardConnected ? '已接入' : '待确认',
+        status: dashboardConnected ? '正常' : '未接入',
       })),
     [dashboardConnected, summary],
   );
 
   const runtimeSignals: RuntimeSignal[] = [
     {
-      name: 'Backend API Health',
+      name: '服务健康状态',
       status: healthStatus === 'healthy' ? 'success' : healthStatus ? 'warning' : 'default',
-      value: healthStatus || '未返回',
+      value: healthStatus === 'healthy' ? '正常' : healthStatus || '检测中',
     },
     {
-      name: 'Runtime Instances',
+      name: '运行实例',
       status: runtimeTotal === null ? 'default' : runtimeTotal > 0 ? 'processing' : 'warning',
-      value: runtimeTotal === null ? '未返回' : `${runtimeTotal} 个`,
+      value: runtimeTotal === null ? '检测中' : `${runtimeTotal} 个`,
     },
     {
-      name: 'Observability Dashboard',
+      name: '可观测性',
       status: dashboardConnected ? 'success' : 'error',
       value: dashboardConnected ? '已连接' : '未连接',
     },
@@ -207,28 +204,28 @@ export function DashboardPage(): JSX.Element {
       <section className="dashboard-hero">
         <div>
           <Space size={8} wrap>
-            <Tag color="processing">AIPulse Command Center</Tag>
-            <Tag color={dashboardConnected ? 'success' : 'error'}>{dashboardConnected ? '生产数据已连接' : '生产数据未连接'}</Tag>
+            <Tag color="processing">AIPulse AgentOS</Tag>
+            <Tag color={dashboardConnected ? 'success' : 'error'}>{dashboardConnected ? '系统运行正常' : '系统未连接'}</Tag>
           </Space>
-          <Typography.Title level={1}>智能体生产运行指挥中心</Typography.Title>
+          <Typography.Title level={1}>运行指挥中心</Typography.Title>
         </div>
         <div className="hero-control-panel">
           <div className="hero-control-title">
             <CloudServerOutlined />
-            <span>生产控制面</span>
+            <span>系统信息</span>
           </div>
           <div className="hero-control-grid">
             <span>租户</span>
             <strong>{tenantName}</strong>
-            <span>权限</span>
-            <strong>observability:read</strong>
-            <span>数据源</span>
-            <strong>/api/v1</strong>
+            <span>环境</span>
+            <strong>生产环境</strong>
+            <span>版本</span>
+            <strong>v1.0</strong>
           </div>
         </div>
       </section>
 
-      {error ? <Alert className="mb-4" type="error" showIcon message="生产观测数据未加载" description={error} /> : null}
+      {error ? <Alert className="mb-4" type="error" showIcon message="数据加载失败" description={error} /> : null}
 
       <Row gutter={[16, 16]} className="metric-row">
         {metricCards.map((item) => (
@@ -251,16 +248,16 @@ export function DashboardPage(): JSX.Element {
             title={
               <Space>
                 <ControlOutlined />
-                <span>生产能力闭环</span>
+                <span>平台能力概览</span>
               </Space>
             }
           >
             <div className="lifecycle-strip">
               {[
-                { title: '开发态', text: 'Agent / Workflow / Prompt', icon: <ApartmentOutlined /> },
-                { title: '发布态', text: '版本、灰度、市场分发', icon: <ThunderboltOutlined /> },
-                { title: '运行态', text: '会话、调度、多智能体', icon: <ApiOutlined /> },
-                { title: '治理态', text: '护栏、审计、成本、权限', icon: <SafetyCertificateOutlined /> },
+                { title: '开发', text: '智能体、工作流、提示词', icon: <ApartmentOutlined /> },
+                { title: '发布', text: '版本管理、灰度发布', icon: <ThunderboltOutlined /> },
+                { title: '运行', text: '对话、调度、多智能体协同', icon: <ApiOutlined /> },
+                { title: '治理', text: '安全护栏、审计、成本管控', icon: <SafetyCertificateOutlined /> },
               ].map((item, index) => (
                 <div className="lifecycle-step" key={item.title}>
                   <span className="lifecycle-index">{index + 1}</span>
@@ -321,7 +318,6 @@ export function DashboardPage(): JSX.Element {
                   <SafetyCertificateOutlined />
                   <Typography.Text type="secondary">告警事件</Typography.Text>
                   <strong>{alertCount}</strong>
-                  <small>来自 alert_events</small>
                 </div>
               </Col>
               <Col xs={24} md={12}>
@@ -329,12 +325,11 @@ export function DashboardPage(): JSX.Element {
                   <ToolOutlined />
                   <Typography.Text type="secondary">质量缺陷</Typography.Text>
                   <strong>{badCaseCount}</strong>
-                  <small>来自 bad_cases</small>
                 </div>
               </Col>
             </Row>
             {alertCount === 0 && badCaseCount === 0 ? (
-              <Empty className="mt-4" image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前生产观测接口未返回告警或质量缺陷" />
+              <Empty className="mt-4" image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前无告警或质量缺陷，系统运行正常" />
             ) : null}
           </Card>
         </Col>
@@ -359,8 +354,8 @@ export function DashboardPage(): JSX.Element {
               </div>
             ) : (
               <div className="empty-live-summary">
-                <Typography.Text strong>暂无生产观测数据</Typography.Text>
-                <Typography.Text type="secondary">请确认当前账号拥有 observability:read 权限，并且后端已经写入运行数据。</Typography.Text>
+                <Typography.Text strong>暂无运行数据</Typography.Text>
+                <Typography.Text type="secondary">系统启动后将自动采集运行指标数据。</Typography.Text>
               </div>
             )}
           </Card>
