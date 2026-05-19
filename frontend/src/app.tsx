@@ -38,7 +38,7 @@ export function App(): JSX.Element {
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/scheduler" element={<SchedulerPage />} />
         <Route path="/cost-analytics" element={<CostAnalyticsPage />} />
-        <Route path="/trace-visualization" element={<TraceVisualizationPage />} />
+        <Route path="/trace" element={<TraceVisualizationPage />} />
         {pageConfigs.map((page) => (
           <Route key={page.path} path={page.path} element={<ResourcePage page={page} />} />
         ))}
@@ -46,4 +46,3 @@ export function App(): JSX.Element {
     </ProLayout>
   );
 }
-
