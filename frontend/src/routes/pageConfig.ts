@@ -1,135 +1,68 @@
 import type { PageConfig } from '../models/types';
 
 const pages: Array<[string, string, string, string, PageConfig['designer']?]> = [
-  ['/dashboard', '首页运行大盘', '/observability/dashboard', '首页'],
-  ['/chat', '对话', '/chat/sessions', '对话'],
-  ['/tenants', '租户管理', '/tenants', '身份与权限'],
-  ['/users', '用户管理', '/users', '身份与权限'],
-  ['/organizations', '组织管理', '/orgs', '身份与权限'],
-  ['/roles', '角色权限管理', '/roles', '身份与权限'],
-  ['/permissions/menu', '菜单权限管理', '/permissions', '身份与权限'],
-  ['/permissions/api', 'API 权限管理', '/permissions', '身份与权限'],
-  ['/agents', 'Agent 列表', '/agents', 'Agent'],
-  ['/agents/create', 'Agent 创建向导', '/agents', 'Agent', 'agent'],
-  ['/agents/config', 'Agent 配置页', '/agents', 'Agent'],
-  ['/agents/model', 'Agent 模型配置页', '/models', 'Agent'],
-  ['/agents/prompt', 'Agent 提示词配置页', '/agents', 'Agent'],
-  ['/agents/tools', 'Agent 工具绑定页', '/tools', 'Agent'],
-  ['/agents/knowledge', 'Agent 知识库绑定页', '/knowledge-bases', 'Agent'],
-  ['/agents/memory', 'Agent 记忆策略页', '/memories', 'Agent'],
-  ['/agents/security', 'Agent 安全策略页', '/security/content-policies', 'Agent'],
-  ['/agents/versions', 'Agent 版本页', '/agents', 'Agent'],
-  ['/agents/releases', 'Agent 发布页', '/agents', 'Agent'],
-  ['/agents/gray', 'Agent 灰度发布页', '/agents', 'Agent'],
-  ['/agents/rollback', 'Agent 回滚页', '/agents', 'Agent'],
-  ['/agents/debug', 'Agent 调试页', '/runtime/agents/default/debug-run', 'Agent'],
-  ['/agents/monitor', 'Agent 运行监控页', '/observability/runtime-status', 'Agent'],
-  ['/agents/templates', 'Agent 模板市场页', '/agent-templates', 'Agent'],
-  ['/workflows', 'Workflow 列表页', '/workflows', 'Workflow'],
-  ['/workflows/designer', 'Workflow 可视化编排画布', '/workflows', 'Workflow', 'workflow'],
-  ['/workflows/node-config', 'Workflow 节点配置页', '/workflows', 'Workflow'],
-  ['/workflows/model-node', 'Workflow 模型节点配置页', '/models', 'Workflow'],
-  ['/workflows/rag-node', 'Workflow RAG 节点配置页', '/knowledge-bases', 'Workflow'],
-  ['/workflows/runs', 'Workflow 执行记录页', '/workflows', 'Workflow'],
-  ['/workflows/run-detail', 'Workflow 执行详情页', '/workflows', 'Workflow'],
-  ['/workflows/replay', 'Workflow 执行回放页', '/workflows', 'Workflow'],
-  ['/workflows/approvals', '人工审批页', '/workflow-approvals', 'Workflow'],
-  ['/model/providers', '模型 Provider 管理页', '/model-providers', '模型'],
-  ['/model/provider-capabilities', 'Provider 能力页', '/model-providers', '模型'],
-  ['/model/credentials', '模型凭证池管理页', '/model-credentials', '模型'],
-  ['/model/endpoints', '模型 Endpoint 管理页', '/model-endpoints', '模型'],
-  ['/model/list', '模型列表页', '/models', '模型'],
-  ['/model/detail', '模型详情页', '/models', '模型'],
-  ['/model/versions', '模型版本页', '/models', '模型'],
-  ['/model/capabilities', '模型能力配置页', '/model-access-policies', '模型'],
-  ['/model/parameters', '模型参数配置页', '/models', '模型'],
-  ['/model/test', '模型测试调用页', '/models', '模型'],
-  ['/model/test-chat', '对话模型测试页', '/models', '模型'],
-  ['/model/test-vl', 'VL 模型测试页', '/models', '模型'],
-  ['/model/test-embedding', 'Embedding 模型测试页', '/models', '模型'],
-  ['/model/test-rerank', 'Rerank 模型测试页', '/models', '模型'],
-  ['/model/test-moderation', 'Moderation 模型测试页', '/models', '模型'],
-  ['/model-routing/policies', '模型路由策略页', '/model-routing-policies', '模型路由'],
-  ['/model-routing/fallback', '模型 fallback 链配置页', '/model-routing-policies', '模型路由'],
-  ['/model/calls', '模型调用统计页', '/model-cost-stats', '模型路由'],
-  ['/model/logs', '模型调用日志页', '/model-call-logs', '模型路由'],
-  ['/model/cost', '模型成本统计页', '/model-cost-stats', '模型路由'],
-  ['/tools', '工具市场页', '/tools', '工具'],
-  ['/tools/detail', '工具详情页', '/tools', '工具'],
-  ['/tools/register', '工具注册页', '/tools', '工具'],
-  ['/tools/versions', '工具版本页', '/tools', '工具'],
-  ['/tools/mcp', 'MCP Server 管理页', '/mcp-servers', '工具'],
-  ['/tools/permissions', '工具权限配置页', '/tools', '工具'],
-  ['/tools/approvals', '高危工具审批页', '/tool-approval-tasks', '工具'],
-  ['/tools/logs', '工具调用日志页', '/tool-call-logs', '工具'],
-  ['/knowledge', '知识库列表页', '/knowledge-bases', '知识库'],
-  ['/knowledge/create', '知识库创建页', '/knowledge-bases', '知识库'],
-  ['/knowledge/detail', '知识库详情页', '/knowledge-bases', '知识库'],
-  ['/knowledge/permissions', '知识库权限页', '/knowledge-bases', '知识库'],
-  ['/knowledge/upload', '文档上传页', '/knowledge-bases', '知识库'],
-  ['/knowledge/status', '文档解析与索引状态页', '/knowledge-bases', '知识库'],
-  ['/knowledge/chunks', '分块预览页', '/knowledge-bases', '知识库'],
-  ['/knowledge/retrieve', '检索测试页', '/knowledge-bases', '知识库'],
-  ['/knowledge/logs', '检索日志页', '/knowledge-bases', '知识库'],
-  ['/memory', '记忆中心首页', '/memories', '记忆'],
-  ['/memory/users', '用户记忆页', '/memories', '记忆'],
-  ['/memory/agents', 'Agent 记忆页', '/memories', '记忆'],
-  ['/memory/sessions', '会话记忆页', '/memories', '记忆'],
-  ['/memory/environments', '环境记忆页', '/memories', '记忆'],
-  ['/memory/global', '全局记忆页', '/memories', '记忆'],
-  ['/memory/detail', '记忆详情页', '/memories', '记忆'],
-  ['/memory/permissions', '记忆权限配置页', '/memory-access-policies', '记忆'],
-  ['/memory/lifecycle', '记忆生命周期策略页', '/memory-lifecycle-policies', '记忆'],
-  ['/memory/conflicts', '记忆冲突处理页', '/memory-conflicts', '记忆'],
-  ['/memory/audit', '记忆审计日志页', '/memory-audit-logs', '记忆'],
-  ['/audit', '审计日志页', '/audit-logs', '审计'],
-  ['/audit/detail', '审计详情页', '/audit-logs', '审计'],
-  ['/audit/export', '审计导出页', '/audit-exports', '审计'],
-  ['/audit/integrity', '审计完整性校验页', '/audit-integrity/verify', '审计'],
-  ['/observability/agents', 'Agent 监控页', '/observability/metrics', '可观测'],
-  ['/observability/workflows', 'Workflow 监控页', '/observability/metrics', '可观测'],
-  ['/observability/models', '模型监控页', '/model-call-logs', '可观测'],
-  ['/observability/logs', '日志检索页', '/observability/logs', '可观测'],
-  ['/observability/traces', 'Trace 查询页', '/observability/traces', '可观测'],
-  ['/observability/trace-detail', 'Trace 详情页', '/observability/traces', '可观测'],
-  ['/alerts/rules', '告警规则页', '/alert-rules', '告警'],
-  ['/alerts/events', '告警事件页', '/alert-events', '告警'],
-  ['/evaluation', '质量评测页', '/evaluation/datasets', '评测'],
-  ['/evaluation/results', '评测结果页', '/evaluation/runs', '评测'],
-  ['/evaluation/prompt', 'Prompt 对比页', '/evaluation/runs', '评测'],
-  ['/evaluation/models', '模型对比页', '/evaluation/runs', '评测'],
-  ['/evaluation/regression', '回归评测页', '/evaluation/runs', '评测'],
-  ['/evaluation/bad-cases', 'Bad Case 分析页', '/bad-cases', '评测'],
-  ['/security/policies', '安全策略页', '/security/content-policies', '安全'],
-  ['/security/sensitive', '敏感规则页', '/security/sensitive-rules', '安全'],
-  ['/security/prompt-injection', 'Prompt 注入规则页', '/security/prompt-injection-rules', '安全'],
-  ['/security/ip', 'IP 白名单页', '/security/ip-allowlists', '安全'],
-  ['/security/rate-limit', 'API 限流页', '/security/rate-limit-rules', '安全'],
-  ['/security/events', '安全事件页', '/security/events', '安全'],
-  ['/multi-agent', 'Multi-Agent 协作', '/agent-teams', 'Multi-Agent'],
-  ['/multi-agent/teams', 'Agent 团队管理', '/agent-teams', 'Multi-Agent'],
-  ['/multi-agent/runs', '团队执行记录', '/agent-teams', 'Multi-Agent'],
-  ['/guardrails', '护栏策略', '/guardrails/policies', '护栏'],
-  ['/guardrails/violations', '违规记录', '/guardrails/violations', '护栏'],
-  ['/guardrails/test', '护栏测试', '/guardrails/check-input', '护栏'],
-  ['/prompt-studio', 'Prompt 工作台', '/prompt-templates', 'Prompt'],
-  ['/prompt-studio/playground', 'Playground', '/prompt-playground/run', 'Prompt'],
-  ['/prompt-studio/ab-tests', 'A/B 测试', '/prompt-ab-tests', 'Prompt'],
-  ['/marketplace', 'Agent 市场', '/marketplace/listings', '市场'],
-  ['/marketplace/installs', '已安装', '/marketplace/installs', '市场'],
-  ['/marketplace/publish', '发布管理', '/marketplace/listings', '市场'],
-  ['/scheduler', '调度中心', '/scheduler/jobs', '调度'],
-  ['/scheduler/webhooks', 'Webhooks', '/scheduler/webhooks', '调度'],
-  ['/scheduler/triggers', '事件触发器', '/scheduler/triggers', '调度'],
-  ['/cost-analytics', '成本分析', '/cost/summary', '成本'],
-  ['/cost-analytics/budgets', '预算管理', '/cost/budgets', '成本'],
-  ['/cost-analytics/alerts', '成本告警', '/cost/alerts', '成本'],
-  ['/trace-visualization', 'Trace 瀑布图', '/observability/traces', '可观测'],
-  ['/agents/publish', 'Agent 发布管理', '/agent-publications', 'Agent'],
-  ['/agents/widgets', 'Agent Widget', '/agent-widgets', 'Agent'],
-  ['/agents/channels', '渠道接入', '/agent-channels', 'Agent'],
-  ['/system', '系统配置页', '/system/configs', '系统']
+  // 首页
+  ['/dashboard', '运行大盘', '/observability/dashboard', '首页'],
+
+  // 开发 — Agent
+  ['/agents', 'Agent 列表', '/agents', '开发'],
+  ['/agents/create', 'Agent 创建向导', '/agents', '开发', 'agent'],
+
+  // 开发 — Workflow
+  ['/workflows', 'Workflow 列表', '/workflows', '开发'],
+  ['/workflows/designer', 'Workflow 编排', '/workflows', '开发', 'workflow'],
+
+  // 开发 — Prompt
+  ['/prompt-studio', 'Prompt 工作台', '/prompt-templates', '开发'],
+
+  // 开发 — 工具
+  ['/tools', '工具中心', '/tools', '开发'],
+
+  // 开发 — 知识库
+  ['/knowledge', '知识库', '/knowledge-bases', '开发'],
+
+  // 开发 — 记忆
+  ['/memory', '记忆中心', '/memories', '开发'],
+
+  // 运行 — 对话
+  ['/chat', '对话', '/chat/sessions', '运行'],
+
+  // 运行 — Multi-Agent
+  ['/multi-agent', 'Multi-Agent', '/agent-teams', '运行'],
+
+  // 运行 — 调度
+  ['/scheduler', '调度中心', '/scheduler/jobs', '运行'],
+
+  // 运行 — 市场
+  ['/marketplace', '市场', '/marketplace/listings', '运行'],
+
+  // 治理 — 模型
+  ['/models', '模型中心', '/models', '治理'],
+  ['/model-routing', '模型路由', '/model-routing-policies', '治理'],
+
+  // 治理 — 安全与护栏
+  ['/security', '安全策略', '/security/content-policies', '治理'],
+  ['/guardrails', '护栏', '/guardrails/policies', '治理'],
+
+  // 治理 — 评测
+  ['/evaluation', '评测', '/evaluation/datasets', '治理'],
+
+  // 治理 — 审计
+  ['/audit', '审计日志', '/audit-logs', '治理'],
+
+  // 治理 — 成本
+  ['/cost-analytics', '成本分析', '/cost/summary', '治理'],
+
+  // 治理 — 监控
+  ['/trace', 'Trace', '/observability/traces', '治理'],
+  ['/alerts', '告警', '/alerts/rules', '治理'],
+
+  // 设置 — 租户与权限
+  ['/tenants', '租户管理', '/tenants', '设置'],
+  ['/users', '用户与角色', '/users', '设置'],
+
+  // 设置 — 系统
+  ['/system', '系统配置', '/system/configs', '设置'],
 ];
 
 export const pageConfigs: PageConfig[] = pages.map(([path, title, api, group, designer]) => ({ path, title, api, group, designer }));
-

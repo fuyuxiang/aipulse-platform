@@ -211,3 +211,6 @@ backup
 # Added by cargo
 
 /target
+
+# Service PID files
+.pids/
