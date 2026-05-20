@@ -7,9 +7,9 @@ from app.api.deps import TenantIdDep, get_db, require_permission
 from app.api.v1.domain_router import add_action_route, add_crud_routes, add_list_route
 from app.models.core import User
 from app.schemas.common import ResourceRead
-from app.services.agent_service import AgentService
-from app.services.agent_publication_service import AgentPublicationService
-from app.services.resource_service import ResourceService
+from app.services.build.agent_service import AgentService
+from app.services.runtime.agent_publication_service import AgentPublicationService
+from app.services._shared.resource_service import ResourceService
 
 router = APIRouter(tags=["agents"])
 

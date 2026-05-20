@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.api.v1.domain_router import add_crud_routes, add_list_route
 from app.models.core import User
-from app.services.security_service import SecurityService
+from app.services.settings.security_service import SecurityService
 
 router = APIRouter(tags=["security"])
 

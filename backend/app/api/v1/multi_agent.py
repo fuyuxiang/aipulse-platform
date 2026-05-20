@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.models.core import User
-from app.services.multi_agent_service import MultiAgentService
+from app.services.runtime.multi_agent_service import MultiAgentService
 
 router = APIRouter(tags=["multi-agent"])
 

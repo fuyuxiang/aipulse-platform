@@ -8,7 +8,7 @@ from app.core.response import ListResponse
 from app.models.core import Tenant, User
 from app.repositories.base import SQLAlchemyRepository
 from app.schemas.auth import TenantCreate, TenantUpdate
-from app.services.audit_service import AuditService
+from app.services.observe.audit_service import AuditService
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 

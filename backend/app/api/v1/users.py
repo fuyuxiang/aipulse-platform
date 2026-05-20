@@ -9,7 +9,7 @@ from app.core.security import hash_password
 from app.models.core import User
 from app.repositories.base import SQLAlchemyRepository
 from app.schemas.auth import UserCreate, UserUpdate
-from app.services.audit_service import AuditService
+from app.services.observe.audit_service import AuditService
 
 router = APIRouter(prefix="/users", tags=["users"])
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.models.core import User
-from app.services.prompt_studio_service import PromptStudioService
+from app.services.build.prompt_studio_service import PromptStudioService
 
 router = APIRouter(tags=["prompt-studio"])
 

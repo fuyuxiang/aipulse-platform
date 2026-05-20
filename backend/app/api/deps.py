@@ -11,8 +11,8 @@ from app.core.errors import AppError
 from app.core.tracing import tenant_id_var, user_id_var
 from app.db.session import get_db
 from app.models.core import User
-from app.services.auth_service import AuthService
-from app.services.rbac_service import RBACService
+from app.services._shared.auth_service import AuthService
+from app.services.settings.rbac_service import RBACService
 
 DbSession = Annotated[Session, Depends(get_db)]
 

@@ -10,7 +10,7 @@ from app.api.deps import get_db, get_tenant_id, require_permission
 from app.core.response import ListResponse
 from app.models.core import User
 from app.schemas.common import ActionRequest, ActionResponse, ResourceCreate, ResourceRead, ResourceUpdate
-from app.services.resource_service import ResourceService
+from app.services._shared.resource_service import ResourceService
 
 
 def _read(row: Any) -> ResourceRead:

@@ -128,6 +128,18 @@ const PAGE_META: Record<string, PageMeta> = {
     owner: '平台管理员',
     objective: '最小权限',
   },
+  '/roles': {
+    domain: '角色管理',
+    description: '维护平台角色、权限组合与适用范围，支撑细粒度访问控制。',
+    owner: '平台管理员',
+    objective: '权责清晰',
+  },
+  '/orgs': {
+    domain: '组织管理',
+    description: '管理租户内部的组织树、部门归属与资源可见性边界。',
+    owner: '平台管理员',
+    objective: '组织对齐',
+  },
   '/system/configs': {
     domain: '系统配置',
     description: '维护平台级开关、运行参数、集成配置和基础设施能力。',

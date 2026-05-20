@@ -7,7 +7,7 @@ from io import BytesIO
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.knowledge_service import KnowledgeService
+from app.services.build.knowledge_service import KnowledgeService
 
 
 def headers(client: TestClient) -> dict[str, str]:

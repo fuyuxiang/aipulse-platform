@@ -16,7 +16,7 @@ from app.core.tracing import RequestContextMiddleware
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.models.core import Tenant
-from app.services.scheduler_service import SchedulerService
+from app.services.settings.scheduler_service import SchedulerService
 
 
 def create_app() -> FastAPI:
