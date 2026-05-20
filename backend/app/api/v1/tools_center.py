@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.api.v1.domain_router import add_action_route, add_crud_routes, add_list_route
 from app.models.core import User
-from app.services.tool_service import ToolService
+from app.services.build.tool_service import ToolService
 
 router = APIRouter(tags=["tools-center"])
 

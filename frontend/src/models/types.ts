@@ -20,6 +20,10 @@ export interface ResourceRecord {
   agent_id?: string;
   workflow_id?: string;
   session_id?: string;
+  parent_id?: string;
+  owner_id?: string;
+  user_id?: string;
+  trace_id?: string;
   config?: Record<string, unknown>;
   spec?: Record<string, unknown>;
   metadata_json?: Record<string, unknown>;

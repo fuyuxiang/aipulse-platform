@@ -19,7 +19,7 @@ export function LoginPage(): JSX.Element {
       setTokens(tokens);
       localStorage.setItem('aipulse_tenant', values.tenant);
       localStorage.setItem('aipulse_username', values.username);
-      navigate('/dashboard');
+      navigate('/home');
     } catch (error) {
       message.error(error instanceof Error ? error.message : '登录失败');
     }

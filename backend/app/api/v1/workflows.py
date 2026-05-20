@@ -8,8 +8,8 @@ from app.api.v1.domain_router import add_crud_routes, add_list_route
 from app.core.response import ListResponse
 from app.models.core import User
 from app.schemas.common import ResourceRead
-from app.services.resource_service import ResourceService
-from app.services.workflow_service import WorkflowService
+from app.services._shared.resource_service import ResourceService
+from app.services.build.workflow_service import WorkflowService
 from app.websocket.manager import websocket_manager
 
 router = APIRouter(tags=["workflows"])

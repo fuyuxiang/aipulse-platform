@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.models.core import User
-from app.services.guardrail_service import GuardrailService
+from app.services.settings.guardrail_service import GuardrailService
 
 router = APIRouter(tags=["guardrails"])
 

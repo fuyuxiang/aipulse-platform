@@ -48,7 +48,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   login: (payload: LoginPayload) => request<TokenPair>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request<Record<string, unknown>>('/auth/me'),
-  list: (path: string, page = 1, pageSize = 20) => request<ListResponse<ResourceRecord>>(`${path}?page=${page}&page_size=${pageSize}`),
+  list: <T = ResourceRecord>(path: string, page = 1, pageSize = 20) => request<ListResponse<T>>(`${path}?page=${page}&page_size=${pageSize}`),
   create: (path: string, payload: Partial<ResourceRecord>) => request<ResourceRecord>(path, { method: 'POST', body: JSON.stringify(payload) }),
   update: (path: string, id: string, payload: Partial<ResourceRecord>) => request<ResourceRecord>(`${path}/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   remove: (path: string, id: string) => request<Record<string, string>>(`${path}/${id}`, { method: 'DELETE' }),

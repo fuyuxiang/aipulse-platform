@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.services.resource_service import ResourceService
+from app.services._shared.resource_service import ResourceService
 
 project_root = settings.project_root
 if str(project_root) not in sys.path:

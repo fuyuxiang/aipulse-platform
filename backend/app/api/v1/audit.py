@@ -7,8 +7,8 @@ from app.api.deps import TenantIdDep, get_db, require_permission
 from app.api.v1.domain_router import add_list_route
 from app.models.core import User
 from app.schemas.common import ResourceRead
-from app.services.audit_service import AuditService
-from app.services.resource_service import ResourceService
+from app.services.observe.audit_service import AuditService
+from app.services._shared.resource_service import ResourceService
 
 router = APIRouter(tags=["audit"])
 

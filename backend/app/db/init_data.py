@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import MODEL_PROVIDER_TYPES, MODEL_TYPES, ROUTING_POLICY_TYPES
 from app.models.core import Permission, Role, RolePermission, Tenant
-from app.services.auth_service import ensure_default_identity
-from app.services.resource_service import ResourceService
+from app.services._shared.auth_service import ensure_default_identity
+from app.services._shared.resource_service import ResourceService
 
 
 DOMAINS = [

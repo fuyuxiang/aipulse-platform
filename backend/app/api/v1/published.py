@@ -13,9 +13,9 @@ from app.api.deps import get_db
 from app.core.constants import ErrorCode
 from app.core.errors import AppError
 from app.models.resources import RESOURCE_MODELS
-from app.services.agent_runner_service import AgentRunnerService
-from app.services.guardrail_service import GuardrailService
-from app.services.resource_service import ResourceService
+from app.services.runtime.agent_runner_service import AgentRunnerService
+from app.services.settings.guardrail_service import GuardrailService
+from app.services._shared.resource_service import ResourceService
 
 router = APIRouter(tags=["published-agents"])
 

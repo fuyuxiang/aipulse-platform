@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.models.core import User
-from app.services.marketplace_service import MarketplaceService
+from app.services.settings.marketplace_service import MarketplaceService
 
 router = APIRouter(tags=["marketplace"])
 

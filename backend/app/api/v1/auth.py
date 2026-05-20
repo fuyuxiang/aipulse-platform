@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentUserDep, get_db
 from app.core.response import ListResponse
 from app.schemas.auth import CurrentUser, LoginRequest, RefreshRequest, RevokeTokenRequest, TokenPair
-from app.services.auth_service import AuthService
+from app.services._shared.auth_service import AuthService
 
 router = APIRouter(tags=["auth"])
 

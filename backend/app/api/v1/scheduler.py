@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
 from app.models.core import User
-from app.services.scheduler_service import SchedulerService
+from app.services.settings.scheduler_service import SchedulerService
 
 router = APIRouter(tags=["scheduler"])
 

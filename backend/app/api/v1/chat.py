@@ -8,8 +8,8 @@ from app.api.deps import TenantIdDep, get_db, require_permission
 from app.core.response import ListResponse
 from app.models.core import User
 from app.schemas.common import ResourceRead
-from app.services.chat_service import ChatService
-from app.services.resource_service import ResourceService
+from app.services.runtime.chat_service import ChatService
+from app.services._shared.resource_service import ResourceService
 
 router = APIRouter(tags=["chat"])
 

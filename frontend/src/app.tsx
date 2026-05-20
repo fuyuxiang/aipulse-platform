@@ -6,18 +6,27 @@ import React from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { buildMenus } from './access/menu';
 import { ResourcePage } from './components/ResourcePage';
-import { ChatPage } from './pages/Chat';
-import { CostAnalyticsPage } from './pages/CostAnalytics';
-import { DashboardPage } from './pages/Dashboard';
-import { GuardrailsPage } from './pages/Guardrails';
+import { ChatPage } from './pages/Playground';
+import { CostAnalyticsPage } from './pages/Observe/Cost';
+import { DashboardPage } from './pages/Home';
+import { GuardrailsPage } from './pages/Settings/Guardrails';
 import { LoginPage } from './pages/Login';
-import { MarketplacePage } from './pages/Marketplace';
-import { MultiAgentPage } from './pages/MultiAgent';
-import { PromptStudioPage } from './pages/PromptStudio';
-import { SchedulerPage } from './pages/Scheduler';
-import { TraceVisualizationPage } from './pages/TraceVisualization';
-import { pageConfigs } from './routes/pageConfig';
+import { MarketplacePage } from './pages/Deploy/Channels';
+import { MultiAgentPage } from './pages/Playground/Multi';
+import { PromptStudioPage } from './pages/Build/Prompts';
+import { SchedulerPage } from './pages/Settings/Scheduler';
+import { TraceVisualizationPage } from './pages/Observe/Trace';
+import { AuditPage } from './pages/Observe/Audit';
+import { AlertsPage } from './pages/Observe/Alerts';
+import { UsersPage } from './pages/Settings/Users';
+import { RolesPage } from './pages/Settings/Roles';
+import { OrganizationsPage } from './pages/Settings/Organizations';
+import { SecurityPage } from './pages/Settings/Security';
+import { SystemPage } from './pages/Settings/System';
+import { legacyRedirects, pageConfigs } from './routes/pageConfig';
 import { getToken } from './services/http';
+
+const HOME_PATH = '/home';
 
 export function App(): JSX.Element {
   const location = useLocation();
@@ -59,7 +68,7 @@ export function App(): JSX.Element {
         className="enterprise-shell"
         route={{ path: '/', routes: buildMenus() }}
         location={{ pathname: location.pathname }}
-        menuItemRender={(item, dom) => <Link to={item.path || '/dashboard'}>{dom}</Link>}
+        menuItemRender={(item, dom) => <Link to={item.path || HOME_PATH}>{dom}</Link>}
         menuFooterRender={() => (
           <div className="menu-runtime-card">
             <div className="menu-runtime-title">AIPulse AgentOS</div>
@@ -75,7 +84,7 @@ export function App(): JSX.Element {
             <Tag icon={<SafetyCertificateOutlined />} color="success">RBAC</Tag>
             <Tooltip title="告警中心">
               <Badge dot={false}>
-                <Button type="text" shape="circle" icon={<BellOutlined />} />
+                <Button type="text" shape="circle" icon={<BellOutlined />} onClick={() => navigate('/observe/alerts')} />
               </Badge>
             </Tooltip>
             <Dropdown
@@ -102,20 +111,30 @@ export function App(): JSX.Element {
             </Dropdown>
           </div>
         )}
-        onMenuHeaderClick={() => navigate('/dashboard')}
+        onMenuHeaderClick={() => navigate(HOME_PATH)}
       >
         <div className="app-content-surface">
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/multi-agent" element={<MultiAgentPage />} />
-            <Route path="/guardrails" element={<GuardrailsPage />} />
-            <Route path="/prompt-studio" element={<PromptStudioPage />} />
-            <Route path="/marketplace" element={<MarketplacePage />} />
-            <Route path="/scheduler" element={<SchedulerPage />} />
-            <Route path="/cost-analytics" element={<CostAnalyticsPage />} />
-            <Route path="/trace" element={<TraceVisualizationPage />} />
+            <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
+            <Route path="/home" element={<DashboardPage />} />
+            <Route path="/playground" element={<ChatPage />} />
+            <Route path="/playground/multi" element={<MultiAgentPage />} />
+            <Route path="/settings/guardrails" element={<GuardrailsPage />} />
+            <Route path="/build/prompts" element={<PromptStudioPage />} />
+            <Route path="/deploy/channels" element={<MarketplacePage />} />
+            <Route path="/settings/scheduler" element={<SchedulerPage />} />
+            <Route path="/observe/cost" element={<CostAnalyticsPage />} />
+            <Route path="/observe/trace" element={<TraceVisualizationPage />} />
+            <Route path="/observe/audit" element={<AuditPage />} />
+            <Route path="/observe/alerts" element={<AlertsPage />} />
+            <Route path="/settings/users" element={<UsersPage />} />
+            <Route path="/settings/roles" element={<RolesPage />} />
+            <Route path="/settings/organizations" element={<OrganizationsPage />} />
+            <Route path="/settings/security" element={<SecurityPage />} />
+            <Route path="/settings/system" element={<SystemPage />} />
+            {Object.entries(legacyRedirects).map(([from, to]) => (
+              <Route key={from} path={from} element={<Navigate to={to} replace />} />
+            ))}
             {pageConfigs.map((page) => (
               <Route key={page.path} path={page.path} element={<ResourcePage page={page} />} />
             ))}
