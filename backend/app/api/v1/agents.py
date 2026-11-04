@@ -125,7 +125,7 @@ for path, table in [
     ("/agents/{agent_id}/runs", "agent_run_records"),
     ("/agent-templates", "agent_templates"),
 ]:
-    add_list_route(router, method="get", path=path, table=table, permission="agents")
+    add_list_route(router, method="get", path=path, table=table, permission="agents", filters_from_path=(lambda request: {"agent_id": request.path_params["agent_id"]}) if "{agent_id}" in path else None)
 
 @router.get("/agents/{agent_id}/status")
 def agent_status(agent_id: str, tenant_id: TenantIdDep, _: User = Depends(require_permission("agents:read")), db: Session = Depends(get_db)) -> dict[str, object]:
@@ -221,6 +221,16 @@ def get_publication(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     return AgentPublicationService(db).get_publication(tenant_id, pub_id)
+
+
+@router.put("/agent-publications/{pub_id}")
+def update_publication(
+    pub_id: str, tenant_id: TenantIdDep, payload: dict[str, object] = Body(default_factory=dict),
+    user: User = Depends(require_permission("agents:write")), db: Session = Depends(get_db),
+) -> dict[str, object]:
+    # Published execution snapshots are immutable. Publish again to change configuration.
+    allowed = {k: v for k, v in payload.items() if k in {"name", "description", "status", "enabled"}}
+    return AgentPublicationService(db).update_publication(tenant_id, user.id, pub_id, allowed)
 
 
 @router.delete("/agent-publications/{pub_id}")

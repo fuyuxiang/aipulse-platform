@@ -64,6 +64,8 @@ class AgentService:
         agent = self.resources.get("agents", tenant_id, agent_id)
         version_id = str(payload.get("version_id") or "")
         version = self.resources.get("agent_versions", tenant_id, version_id) if version_id else self._latest_version(tenant_id, user_id, agent.id)
+        if version.agent_id != agent.id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "version belongs to a different agent", 422)
         release = self.resources.create(
             "agent_releases",
             tenant_id,
@@ -109,6 +111,9 @@ class AgentService:
             releases, _ = self.resources.list("agent_releases", tenant_id, 1, 20, {"agent_id": agent.id})
             target_version = next((row.version for row in releases if row.version and row.version != agent.version), "")
         if not target_version:
+            raise AppError(ErrorCode.NOT_FOUND, "rollback target version not found", 404)
+        versions, _ = self.resources.list("agent_versions", tenant_id, 1, 1, {"agent_id": agent.id, "version": target_version})
+        if not versions:
             raise AppError(ErrorCode.NOT_FOUND, "rollback target version not found", 404)
         release = self.resources.create(
             "agent_releases",
@@ -173,7 +178,7 @@ class AgentService:
             "agent_debug_sessions",
             tenant_id,
             user_id,
-            {"name": "agent debug", "status": "completed", "agent_id": agent_id, "session_id": str(payload.get("session_id") or "debug"), "input_payload": payload, "output_payload": result},
+            {"name": "agent debug", "status": "completed" if result.get("status") == "success" else result.get("status", "failed"), "agent_id": agent_id, "session_id": str(payload.get("session_id") or "debug"), "input_payload": payload, "output_payload": result},
         )
         return {"debug_session_id": session.id, **result}
 

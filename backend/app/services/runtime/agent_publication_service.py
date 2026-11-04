@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -18,6 +19,18 @@ class AgentPublicationService:
 
     def publish_as_api(self, tenant_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         agent_id = str(payload.get("agent_id", ""))
+        agent = self.resources.get("agents", tenant_id, agent_id)
+        snapshot = {**dict(agent.spec or {}), **dict(agent.config or {})}
+        version_id = str(payload.get("version_id") or "")
+        if version_id:
+            version = self.resources.get("agent_versions", tenant_id, version_id)
+            if version.agent_id != agent_id:
+                from app.core.constants import ErrorCode
+                from app.core.errors import AppError
+                raise AppError(ErrorCode.VALIDATION_ERROR, "version belongs to a different agent", 422)
+            source = (version.spec or {}).get("agent") or {}
+            snapshot = {**dict(source.get("spec") or {}), **dict(version.config or {})}
+        snapshot_id = hashlib.sha256(json.dumps(snapshot, sort_keys=True, default=str).encode()).hexdigest()[:16]
         name = str(payload.get("name", ""))
         api_key = f"ak-{secrets.token_hex(24)}"
         api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
@@ -29,6 +42,9 @@ class AgentPublicationService:
             "agent_id": agent_id,
             "spec": {
                 "type": "api",
+                "agent_config_snapshot": snapshot,
+                "source_version": version_id or "draft_snapshot",
+                "snapshot_id": snapshot_id,
                 "agent_id": agent_id,
                 "endpoint": f"/api/v1/published/{agent_id}/chat",
                 "api_key_hash": api_key_hash,
@@ -37,8 +53,8 @@ class AgentPublicationService:
                 "max_tokens": int(payload.get("max_tokens", 4096)),
                 "temperature": float(payload.get("temperature", 0.7)),
                 "system_prompt_override": str(payload.get("system_prompt_override", "")),
-                "knowledge_base_ids": payload.get("knowledge_base_ids", []),
-                "tool_ids": payload.get("tool_ids", []),
+                "knowledge_base_ids": payload.get("knowledge_base_ids", snapshot.get("knowledge_base_ids", [])),
+                "tool_ids": payload.get("tool_ids", snapshot.get("tool_ids", [])),
                 "guardrail_policy_ids": payload.get("guardrail_policy_ids", []),
                 "description": str(payload.get("description", "")),
                 "version": str(payload.get("version", "1.0.0")),
@@ -190,6 +206,7 @@ class AgentPublicationService:
         self.resources.update("agent_publications", tenant_id, user_id, pub_id, {"spec": spec})
 
         keys, _ = self.resources.list("agent_api_keys", tenant_id, 1, 100, {"parent_id": pub_id})
+        active_spec = next((dict(key.spec or {}) for key in keys if key.status == "active"), {})
         for key in keys:
             self.resources.update("agent_api_keys", tenant_id, user_id, key.id, {"status": "revoked"})
 
@@ -202,7 +219,8 @@ class AgentPublicationService:
             "spec": {
                 "key_hash": new_hash,
                 "key_prefix": new_key[:8],
-                "permissions": ["chat", "stream"],
+                "permissions": active_spec.get("permissions", ["chat"]),
+                "expires_at": active_spec.get("expires_at", ""),
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "last_used_at": None,
                 "total_uses": 0,

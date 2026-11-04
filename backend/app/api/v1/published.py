@@ -40,26 +40,33 @@ async def published_agent_chat(
     if not input_check.get("passed", True):
         raise AppError(ErrorCode.FORBIDDEN, "input blocked by guardrails", 403)
 
+    if "agent_config_snapshot" not in spec:
+        raise AppError(ErrorCode.BUSINESS_ERROR, "legacy publication must be republished to pin its configuration", 409)
     _enforce_rate_limit(ResourceService(db), publication, "published-api")
     result = await AgentRunnerService(db).run(
         tenant_id,
-        "published-api",
+        f"published:{key.id}",
         agent_id,
         {
             "prompt": input_check.get("masked_content") or content,
-            "session_id": str(payload.get("session_id") or "published"),
+            "session_id": hashlib.sha256(f"{key.id}:{payload.get('session_id') or 'published'}".encode()).hexdigest(),
             "knowledge_base_ids": spec.get("knowledge_base_ids", []),
             "tool_ids": spec.get("tool_ids", []),
             "guardrail_policy_ids": guardrail_policy_ids,
-            "memory_policy": {"enabled": True, "write_scope": "tenant", "shared": True, "include_shared": True},
+            "memory_policy": {"enabled": False},
             "resource_limits": {"timeout_seconds": int(spec.get("timeout_seconds") or 120)},
         },
+        config_snapshot={**spec["agent_config_snapshot"], **({"system_prompt": spec["system_prompt_override"]} if spec.get("system_prompt_override") else {})},
     )
+    if result.get("status") == "waiting_approval":
+        _record_key_use(ResourceService(db), key, "published-api")
+        return {"agent_id": agent_id, "publication_id": publication.id, "run_id": result.get("run_id"),
+                "status": "waiting_approval", "approval_id": result.get("approval_id"), "response": ""}
     response = str(result.get("response") or "")
     output_check = guardrails.check_output(
         tenant_id,
         "published-api",
-        {"content": response, "policy_ids": guardrail_policy_ids, "agent_id": agent_id, "knowledge_context": payload.get("knowledge_context", [])},
+        {"content": response, "policy_ids": guardrail_policy_ids, "agent_id": agent_id, "knowledge_context": (result.get("rag") or {}).get("sources", [])},
     )
     if not output_check.get("passed", True):
         raise AppError(ErrorCode.FORBIDDEN, "output blocked by guardrails", 403)
@@ -67,6 +74,7 @@ async def published_agent_chat(
     return {
         "agent_id": agent_id,
         "publication_id": publication.id,
+        "status": "success",
         "run_id": result.get("run_id"),
         "session_id": result.get("session_id"),
         "response": output_check.get("masked_content") or response,
@@ -78,7 +86,7 @@ def _authenticate_publication(db: Session, agent_id: str, api_key: str, permissi
     if not api_key:
         raise AppError(ErrorCode.UNAUTHORIZED, "missing X-API-Key", 401)
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    key_model = RESOURCE_MODELS["agent_api_keys"]
+    key_model: Any = RESOURCE_MODELS["agent_api_keys"]
     rows = db.scalars(
         select(key_model).where(
             key_model.agent_id == agent_id,
@@ -91,12 +99,20 @@ def _authenticate_publication(db: Session, agent_id: str, api_key: str, permissi
         spec = dict(row.spec or {})
         if not hmac.compare_digest(str(spec.get("key_hash") or ""), key_hash):
             continue
+        expiry = str(spec.get("expires_at") or "")
+        if expiry:
+            try:
+                expired = datetime.fromisoformat(expiry.replace("Z", "+00:00")).replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)
+            except ValueError:
+                expired = True
+            if expired:
+                raise AppError(ErrorCode.UNAUTHORIZED, "api key expired", 401)
         permissions = set(spec.get("permissions") or [])
         if permission not in permissions and "*" not in permissions:
             raise AppError(ErrorCode.FORBIDDEN, "api key permission denied", 403)
         publication = ResourceService(db).get("agent_publications", row.tenant_id, row.parent_id)
         pub_spec = dict(publication.spec or {})
-        if publication.status != "active" or pub_spec.get("type") != "api":
+        if publication.status != "active" or not publication.enabled or pub_spec.get("type") != "api":
             raise AppError(ErrorCode.FORBIDDEN, "publication is not active", 403)
         return publication, row
     raise AppError(ErrorCode.UNAUTHORIZED, "invalid X-API-Key", 401)
