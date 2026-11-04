@@ -1,0 +1,117 @@
+// AIPulse current implementation: a layered component view, not a deployment plan.
+// Render from the repository root with Graphviz:
+// dot -Tsvg docs/assets/aipulse-architecture.dot -o docs/assets/aipulse-architecture.svg
+// dot -Tpng -Gdpi=144 docs/assets/aipulse-architecture.dot -o docs/assets/aipulse-architecture.png
+digraph AIPulse {
+  graph [
+    rankdir=TB, bgcolor="#ffffff", pad="0.36", nodesep="0.42", ranksep="0.56",
+    splines=polyline, compound=true, outputorder=edgesfirst,
+    fontname="PingFang SC", fontsize=21, fontcolor="#14213d",
+    labelloc=t, labeljust=l,
+    label=<<B>AIPulse · Enterprise Agent Platform</B><BR/><FONT POINT-SIZE="12" COLOR="#64748b">控制平面 · 业务执行 · 引擎适配 / 分层组件视图</FONT>>
+  ];
+  node [shape=box, style="rounded,filled", fillcolor="#ffffff", color="#d9e2ef",
+        penwidth=1.2, fontname="PingFang SC", fontsize=12, fontcolor="#334155", margin="0.20,0.15"];
+  edge [color="#7890ad", penwidth=1.25, arrowsize=0.7, fontname="PingFang SC",
+        fontsize=10, fontcolor="#64748b"];
+
+  console [fillcolor="#edf4ff", color="#9bbcff", label=<
+    <B>Web 控制台</B><BR/><FONT POINT-SIZE="11">React 18 · TypeScript · Ant Design · X6</FONT><BR/>
+    <FONT POINT-SIZE="10" COLOR="#64748b">工作台 / 智能体 / 对话 / 工作流 / 团队 / 发布</FONT>>];
+  client [fillcolor="#f5f7fb", label=<
+    <B>外部业务应用</B><BR/><FONT POINT-SIZE="11">已发布智能体 API</FONT><BR/>
+    <FONT POINT-SIZE="10" COLOR="#64748b">X-API-Key · 配置快照</FONT>>];
+  { rank=same; console; client; }
+
+  subgraph cluster_backend {
+    label=<<B>平台后端进程</B><FONT POINT-SIZE="11">  backend/ + runtime/ + Echo Agent Python 包</FONT>>;
+    fontname="PingFang SC"; fontsize=13; fontcolor="#3d5576";
+    color="#cbd8ea"; fillcolor="#f8faff"; style="rounded,filled"; margin=22;
+
+    api [fillcolor="#2563eb", color="#2563eb", fontcolor="#ffffff", label=<
+      <B>FastAPI 入口与访问控制</B><BR/>
+      <FONT POINT-SIZE="11">JWT / API Key · 租户上下文 · RBAC · 请求追踪</FONT>>];
+
+    business [fillcolor="#ffffff", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5">
+        <TR><TD COLSPAN="3"><B>业务服务与资源管理</B></TD></TR>
+        <TR>
+          <TD>智能体 / 版本 / API 发布<BR/>对话会话 / 团队协作</TD>
+          <TD>工作流 / 工具 / 知识库<BR/>模型配置 / 记忆策略</TD>
+          <TD>租户 / 角色 / 安全护栏<BR/>导入答案评测 / 观测 / 审计</TD>
+        </TR>
+        <TR><TD COLSPAN="3"><FONT POINT-SIZE="10" COLOR="#64748b">ResourceService / Repository · SQLAlchemy 资源持久化</FONT></TD></TR>
+      </TABLE>>];
+
+    subgraph cluster_execution {
+      label=<<B>执行组件</B><FONT POINT-SIZE="10">  本地 Python 调用与 asyncio 任务</FONT>>;
+      color="#d9e3f2"; fillcolor="#ffffff"; style="rounded,filled"; margin=18;
+
+      workflow [fillcolor="#f0fdfa", color="#96dace", label=<
+        <B>Workflow 执行引擎</B><BR/>
+        <FONT POINT-SIZE="10">WorkflowService / WorkflowExecutor</FONT><BR/>
+        <FONT POINT-SIZE="11">节点 / 分支 / 显式审批 / 检查点</FONT><BR/>
+        <FONT POINT-SIZE="10" COLOR="#64748b">runtime/executors/</FONT>>];
+      runner [fillcolor="#edf4ff", color="#9bbcff", label=<
+        <B>标准 Agent 执行</B><BR/>
+        <FONT POINT-SIZE="10">AgentRunnerService</FONT><BR/>
+        <FONT POINT-SIZE="11">对话 / 团队成员 / 已发布 API</FONT><BR/>
+        <FONT POINT-SIZE="10" COLOR="#64748b">标准 Agent 执行路径</FONT>>];
+      adapter [fillcolor="#f5f3ff", color="#c6b8ef", label=<
+        <B>Runtime 适配与实例管理</B><BR/>
+        <FONT POINT-SIZE="10">RuntimeControlService / Adapter</FONT><BR/>
+        <FONT POINT-SIZE="11">实例生命周期 · 用户工作区 · 配置桥接</FONT><BR/>
+        <FONT POINT-SIZE="10" COLOR="#64748b">runtime/adapter/</FONT>>];
+      { rank=same; workflow; runner; adapter; }
+
+      capabilities [fillcolor="#edf4ff", color="#9bbcff", label=<
+        <B>模型 / 工具 / 知识 / 记忆服务</B><BR/>
+        <FONT POINT-SIZE="11">统一模型调用 · 工具执行 · 安全护栏</FONT><BR/>
+        <FONT POINT-SIZE="11">RAG 检索 · 记忆读写 · 用量记录</FONT>>];
+      engine [fillcolor="#f5f3ff", color="#c6b8ef", label=<
+        <B>Echo Agent 引擎</B><BR/>
+        <FONT POINT-SIZE="11">Agent Loop · 原生 Provider / 工具 / 记忆</FONT><BR/>
+        <FONT POINT-SIZE="10" COLOR="#64748b">echo-agent/ · 保留原有引擎源码</FONT>>];
+      { rank=same; capabilities; engine; }
+    }
+  }
+
+  subgraph cluster_dependencies {
+    label=<<B>数据与外部依赖</B>>;
+    fontname="PingFang SC"; fontsize=13; fontcolor="#3d5576";
+    color="#dce4ec"; fillcolor="#fbfcfe"; style="rounded,filled"; margin=18;
+
+    database [shape=cylinder, fillcolor="#f8fafc", label=<
+      <B>SQLite / SQLAlchemy</B><BR/>
+      <FONT POINT-SIZE="11">资源 / 权限 / 会话 / 运行记录 / 审计</FONT>>];
+    files [shape=folder, fillcolor="#f8fafc", label=<
+      <B>本地文件系统</B><BR/>
+      <FONT POINT-SIZE="11">文档 · JSON 向量索引 · 检查点</FONT><BR/>
+      <FONT POINT-SIZE="11">Runtime 工作区 · JSONL 日志 / Trace</FONT>>];
+    providers [fillcolor="#fffbeb", color="#ead8a1", label=<
+      <B>模型服务与业务工具</B><BR/>
+      <FONT POINT-SIZE="11">对话 / Embedding / Rerank API</FONT><BR/>
+      <FONT POINT-SIZE="11">HTTP 工具与原生工具</FONT>>];
+    { rank=same; database; files; providers; }
+  }
+
+  console -> api [label="REST / SSE / WebSocket"];
+  client -> api [label="HTTP · /api/v1/published/"];
+  api -> business;
+  business -> workflow [label="流程执行"];
+  business -> runner [label="业务 Agent 执行"];
+  business -> adapter [label="Runtime API / 调试"];
+  workflow -> runner [label="Agent\n节点", constraint=false];
+  runner -> adapter [label="无模型\n时回退", style=dashed, color="#9b8aba", constraint=false];
+  runner -> capabilities;
+  workflow -> capabilities [label="模型 / 工具 / RAG 节点"];
+  adapter -> engine [label="进程内 Python API"];
+  capabilities -> database [style=dotted, label="读写业务记录"];
+  capabilities -> files [style=dotted, label="文档 / 向量"];
+  capabilities -> providers [label="HTTP 调用"];
+  engine -> providers [label="原生调用"];
+
+  legend [shape=plain, margin=0, fontcolor="#64748b", fontsize=10,
+          label="实线：调用关系     虚线：条件回退     点线：数据读写\n当前组件在单后端进程中运行；执行与存储设施可沿适配接口演进。"];
+  files -> legend [style=invis];
+}

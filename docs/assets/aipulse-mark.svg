@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" role="img" aria-labelledby="title">
+  <title id="title">AIPulse</title>
+  <rect x="2" y="2" width="76" height="76" rx="22" fill="#2563eb"/>
+  <text x="40" y="49" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" text-anchor="middle">AP</text>
+</svg>
