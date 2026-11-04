@@ -12,6 +12,7 @@ class RuntimeContext:
     version_id: str
     session_id: str
     workspace: str
+    system_prompt: str = ""
     model_config: dict[str, Any] = field(default_factory=dict)
     tool_policy: dict[str, Any] = field(default_factory=dict)
     memory_policy: dict[str, Any] = field(default_factory=dict)

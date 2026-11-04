@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from functools import partial
 from pathlib import Path
 
 from runtime.adapter.config_bridge import ConfigBridge
@@ -50,6 +51,8 @@ class InstanceManager:
         task_manager = TaskManager(storage)
         workflow_engine = WorkflowEngine(storage, task_manager)
         agent_loop = AgentLoop(bus=bus, config=config, provider=provider, workspace=workspace, router=router, storage=storage, task_manager=task_manager, workflow_engine=workflow_engine)
+        if instance.context.system_prompt:
+            agent_loop.context.build_system_prompt = partial(agent_loop.context.build_system_prompt, custom_instructions=instance.context.system_prompt)
         MemoryBridge().apply_policy(agent_loop, instance.context.memory_policy)
         ToolPolicyBridge().apply(agent_loop, instance.context.tool_policy)
         KnowledgeBridge().bind(agent_loop, instance.context.knowledge_bindings)

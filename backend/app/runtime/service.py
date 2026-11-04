@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import sys
+import hashlib
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.constants import ErrorCode
+from app.core.errors import AppError
+from app.models.core import User
 from app.services._shared.resource_service import ResourceService
 
 project_root = settings.project_root
@@ -24,13 +28,15 @@ class RuntimeControlService:
 
     async def create_instance(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         payload = self._hydrate_runtime_payload(tenant_id, agent_id, payload)
-        workspace = settings.resolved_data_dir / "runtime" / tenant_id / agent_id / payload.get("session_id", "default")
+        session_key = hashlib.sha256(f"{user_id}:{payload.get('session_id', 'default')}".encode()).hexdigest()
+        workspace = settings.resolved_data_dir / "runtime" / tenant_id / agent_id / session_key
         context = RuntimeContext(
             tenant_id=tenant_id,
             agent_id=agent_id,
             version_id=str(payload.get("version_id") or "draft"),
             session_id=str(payload.get("session_id") or "default"),
             workspace=str(workspace),
+            system_prompt=str(payload.get("system_prompt") or ""),
             model_config=dict(payload.get("model_config") or {}),
             tool_policy=dict(payload.get("tool_policy") or {}),
             memory_policy=dict(payload.get("memory_policy") or {}),
@@ -56,43 +62,52 @@ class RuntimeControlService:
         return self._instance(instance)
 
     async def start(self, tenant_id: str, user_id: str, instance_id: str) -> dict[str, Any]:
+        self.require_instance(tenant_id, instance_id, user_id)
         instance = await self.adapter.start(instance_id)
         self.resources.action("agent_runtime_instances", tenant_id, user_id, action="start", payload={"instance_id": instance_id})
         return self._instance(instance)
 
     async def stop(self, tenant_id: str, user_id: str, instance_id: str) -> dict[str, Any]:
+        self.require_instance(tenant_id, instance_id, user_id)
         instance = await self.adapter.stop(instance_id)
         self.resources.action("agent_runtime_instances", tenant_id, user_id, action="stop", payload={"instance_id": instance_id})
         return self._instance(instance)
 
     async def restart(self, tenant_id: str, user_id: str, instance_id: str) -> dict[str, Any]:
+        self.require_instance(tenant_id, instance_id, user_id)
         instance = await self.adapter.restart(instance_id)
         self.resources.action("agent_runtime_instances", tenant_id, user_id, action="restart", payload={"instance_id": instance_id})
         return self._instance(instance)
 
     async def destroy(self, tenant_id: str, user_id: str, instance_id: str) -> dict[str, Any]:
+        self.require_instance(tenant_id, instance_id, user_id)
         instance = await self.adapter.destroy(instance_id)
         self.resources.action("agent_runtime_instances", tenant_id, user_id, action="destroy", payload={"instance_id": instance_id})
         return self._instance(instance)
 
     async def debug_run(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         payload = self._hydrate_runtime_payload(tenant_id, agent_id, payload)
-        instances = [item for item in self.adapter.list(tenant_id) if item.context.agent_id == agent_id]
-        instance = instances[0] if instances else await self.adapter.create(
+        # A debug call must use the current configuration and its own user workspace.
+        session_key = hashlib.sha256(f"{user_id}:{payload.get('session_id', 'debug')}".encode()).hexdigest()
+        instance = await self.adapter.create(
             RuntimeContext(
                 tenant_id=tenant_id,
                 agent_id=agent_id,
                 version_id=str(payload.get("version_id") or "draft"),
                 session_id=str(payload.get("session_id") or "debug"),
-                workspace=str(settings.resolved_data_dir / "runtime" / tenant_id / agent_id / "debug"),
-                model_config=dict(payload.get("model_config") or {}),
+                workspace=str(settings.resolved_data_dir / "runtime" / tenant_id / agent_id / session_key),
+                system_prompt=str(payload.get("system_prompt") or ""),
+            model_config=dict(payload.get("model_config") or {}),
                 tool_policy=dict(payload.get("tool_policy") or {}),
                 memory_policy=dict(payload.get("memory_policy") or {}),
                 knowledge_bindings=list(payload.get("knowledge_bindings") or []),
                 resource_limits=dict(payload.get("resource_limits") or {}),
             )
         )
-        result = await self.adapter.debug_run(instance.id, str(payload.get("prompt") or ""), session_id=str(payload.get("session_id") or "debug"))
+        try:
+            result = await self.adapter.debug_run(instance.id, str(payload.get("prompt") or ""), session_id=str(payload.get("session_id") or "debug"))
+        finally:
+            await self.adapter.destroy(instance.id)
         run = self.resources.create(
             "agent_run_records",
             tenant_id,
@@ -103,12 +118,17 @@ class RuntimeControlService:
 
     def _hydrate_runtime_payload(self, tenant_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         hydrated = dict(payload)
-        try:
-            agent = self.resources.get("agents", tenant_id, agent_id)
-        except Exception:
-            return hydrated
+        agent = self.resources.get("agents", tenant_id, agent_id)
         agent_config = dict(agent.config or {})
         agent_spec = dict(agent.spec or {})
+        version_id = str(payload.get("version_id") or "draft")
+        if version_id != "draft":
+            version = self.resources.get("agent_versions", tenant_id, version_id)
+            if version.agent_id != agent_id:
+                raise AppError(ErrorCode.NOT_FOUND, "agent version not found", 404)
+            agent_config = dict(version.config or {})
+            agent_spec = dict(((version.spec or {}).get("agent") or {}).get("spec") or {})
+        hydrated.setdefault("system_prompt", agent_config.get("system_prompt") or agent_spec.get("system_prompt") or "")
         if not hydrated.get("model_config"):
             model_config = dict(agent_config.get("model_config") or agent_spec.get("model_config") or {})
             model_id = str(hydrated.get("model_id") or agent_config.get("model_id") or agent_spec.get("model_id") or "")
@@ -149,8 +169,27 @@ class RuntimeControlService:
         config.setdefault("provider_name", config["provider_type"])
         return config
 
-    def list_instances(self, tenant_id: str) -> list[dict[str, Any]]:
-        return [self._instance(item) for item in self.adapter.list(tenant_id)]
+    def list_instances(self, tenant_id: str, user_id: str) -> list[dict[str, Any]]:
+        user = self.db.get(User, user_id)
+        instances = self.adapter.list(tenant_id)
+        if not (user and user.is_superuser):
+            records, _ = self.resources.list("agent_runtime_instances", tenant_id, 1, 1000, {"created_by": user_id})
+            owned_ids = {(row.output_payload or {}).get("instance_id") for row in records}
+            instances = [item for item in instances if item.id in owned_ids]
+        return [self._instance(item) for item in instances]
+
+    def require_instance(self, tenant_id: str, instance_id: str, user_id: str = "") -> Any:
+        instances = [item for item in self.adapter.list(tenant_id) if item.id == instance_id]
+        if user_id:
+            user = self.db.get(User, user_id)
+            if user is None or not user.is_superuser:
+                records, _ = self.resources.list("agent_runtime_instances", tenant_id, 1, 1000)
+                owned = any(r.created_by == user_id and (r.output_payload or {}).get("instance_id") == instance_id for r in records)
+                if not owned:
+                    instances = []
+        if not instances:
+            raise AppError(ErrorCode.NOT_FOUND, "runtime instance not found", 404)
+        return instances[0]
 
     @staticmethod
     def _instance(instance: Any) -> dict[str, Any]:

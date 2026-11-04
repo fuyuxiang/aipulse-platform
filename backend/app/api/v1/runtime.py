@@ -7,6 +7,7 @@ from app.api.deps import TenantIdDep, get_db, require_permission
 from app.models.core import User
 from app.runtime.service import RuntimeControlService
 from app.websocket.manager import websocket_manager
+from app.websocket.authorization import authorize_run_socket
 
 router = APIRouter(tags=["runtime"])
 
@@ -37,13 +38,15 @@ async def destroy_instance(instance_id: str, tenant_id: TenantIdDep, user: User 
 
 
 @router.get("/runtime/instances/{instance_id}/health")
-def instance_health(instance_id: str, db: Session = Depends(get_db), _: User = Depends(require_permission("runtime:read"))) -> dict[str, object]:
-    return RuntimeControlService(db).adapter.health_check(instance_id)
+def instance_health(instance_id: str, tenant_id: TenantIdDep, db: Session = Depends(get_db), user: User = Depends(require_permission("runtime:read"))) -> dict[str, object]:
+    service = RuntimeControlService(db)
+    service.require_instance(tenant_id, instance_id, user.id)
+    return service.adapter.health_check(instance_id)
 
 
 @router.get("/runtime/instances")
-def list_instances(tenant_id: TenantIdDep, db: Session = Depends(get_db), _: User = Depends(require_permission("runtime:read"))) -> list[dict[str, object]]:
-    return RuntimeControlService(db).list_instances(tenant_id)
+def list_instances(tenant_id: TenantIdDep, db: Session = Depends(get_db), user: User = Depends(require_permission("runtime:read"))) -> list[dict[str, object]]:
+    return RuntimeControlService(db).list_instances(tenant_id, user.id)
 
 
 @router.post("/runtime/agents/{agent_id}/debug-run")
@@ -59,10 +62,13 @@ def get_run(run_id: str, tenant_id: TenantIdDep, db: Session = Depends(get_db), 
 
 @router.websocket("/ws/runtime/runs/{run_id}")
 async def runtime_ws(websocket: WebSocket, run_id: str) -> None:
-    await websocket_manager.connect(run_id, websocket)
+    channel = await authorize_run_socket(websocket, "agent_run_records", run_id, "runtime:read")
+    if channel is None:
+        return
+    await websocket_manager.connect(channel, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        websocket_manager.disconnect(run_id, websocket)
+        websocket_manager.disconnect(channel, websocket)
 

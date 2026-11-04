@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 60
     refresh_token_days: int = 14
     password_salt: str = Field(default_factory=lambda: os.getenv("AIPULSE_PASSWORD_SALT", "local-dev-password-salt"))
-    echo_agent_path: Path = Field(default_factory=lambda: Path("../echo-agent"))
+    echo_agent_path: Path = Field(default_factory=lambda: Path("echo-agent"))
     data_dir: Path = Field(default_factory=lambda: Path("data"))
     database_url: str = "sqlite:///data/sqlite/aipulse.db"
     log_path: Path = Field(default_factory=lambda: Path("data/logs/backend.jsonl"))
