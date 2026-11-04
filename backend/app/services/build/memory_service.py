@@ -8,6 +8,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.services._shared.resource_service import ResourceService
+from app.core.constants import ErrorCode
+from app.core.errors import AppError
 from app.services.settings.security_service import SecurityService
 
 
@@ -15,13 +17,41 @@ class MemoryService:
     def __init__(self, db: Session):
         self.resources = ResourceService(db)
 
+    def can_read(self, row: Any, user_id: str, is_superuser: bool = False) -> bool:
+        if is_superuser or row.user_id == user_id or row.created_by == user_id:
+            return True
+        spec = row.spec or {}
+        if spec.get("scope") in {"tenant", "global", "shared"}:
+            return bool(spec.get("shared"))
+        if spec.get("scope") == "team":
+            team_id = spec.get("team_id") or row.parent_id
+            if team_id:
+                team = self.resources.get("agent_teams", row.tenant_id, team_id)
+                return team.created_by == user_id
+        return False
+
+    def require_item(self, tenant_id: str, user_id: str, memory_id: str, *, write: bool = False) -> Any:
+        from app.models.core import User
+        row = self.resources.get("memory_items", tenant_id, memory_id)
+        user = self.resources.db.get(User, user_id)
+        allowed = bool(user and user.is_superuser) or (row.created_by == user_id if write else self.can_read(row, user_id))
+        if not allowed:
+            raise AppError(ErrorCode.NOT_FOUND, "memory not found", 404)
+        return row
+
     def search(self, tenant_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         query = str(payload.get("query") or payload.get("text") or "")
         scope = str(payload.get("scope") or "")
         agent_id = str(payload.get("agent_id") or "")
         session_id = str(payload.get("session_id") or "")
         subject_user_id = str(payload.get("subject_user_id") or payload.get("user_id") or user_id)
+        if subject_user_id != user_id:
+            raise AppError(ErrorCode.FORBIDDEN, "memory subject must match authenticated user", 403)
         team_id = str(payload.get("team_id") or "")
+        if team_id:
+            team = self.resources.get("agent_teams", tenant_id, team_id)
+            if team.created_by != user_id:
+                raise AppError(ErrorCode.FORBIDDEN, "team memory requires team owner", 403)
         include_shared = bool(payload.get("include_shared", True))
         rows, _ = self.resources.list("memory_items", tenant_id, 1, int(payload.get("limit") or 200))
         matches = []
@@ -50,15 +80,20 @@ class MemoryService:
     def remember(self, tenant_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         content = str(payload.get("content") or payload.get("text") or payload.get("description") or "").strip()
         if not content:
-            from app.core.constants import ErrorCode
-            from app.core.errors import AppError
-
             raise AppError(ErrorCode.VALIDATION_ERROR, "memory content is required", 422)
         scope = str(payload.get("scope") or "session")
         agent_id = str(payload.get("agent_id") or "")
         session_id = str(payload.get("session_id") or "")
         subject_user_id = str(payload.get("subject_user_id") or payload.get("user_id") or user_id)
+        if subject_user_id != user_id:
+            raise AppError(ErrorCode.FORBIDDEN, "memory subject must match authenticated user", 403)
         team_id = str(payload.get("team_id") or "")
+        if team_id:
+            team = self.resources.get("agent_teams", tenant_id, team_id)
+            if team.created_by != user_id:
+                raise AppError(ErrorCode.FORBIDDEN, "team memory requires team owner", 403)
+        if scope == "team" and not team_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "team memory requires team_id", 422)
         content_hash = self._hash(content, scope, agent_id, session_id, subject_user_id, team_id)
         existing = self._find_by_hash(tenant_id, content_hash)
         spec = {
@@ -158,7 +193,7 @@ class MemoryService:
                 {
                     **payload,
                     "text": f"{prompt}\n{response}",
-                    "scope": str(policy.get("extract_scope") or ("tenant" if shared else "user")),
+                    "scope": str(policy.get("extract_scope") or scope),
                     "shared": shared,
                     "source": f"{source}:extract",
                     "form": "semantic",
@@ -204,11 +239,13 @@ class MemoryService:
         return {"job_id": job.id, "memory_id": merged.id, "source_ids": memory_ids}
 
     def archive(self, tenant_id: str, user_id: str, memory_id: str) -> dict[str, Any]:
+        self.require_item(tenant_id, user_id, memory_id, write=True)
         row = self.resources.update("memory_items", tenant_id, user_id, memory_id, {"status": "archived"})
         self._audit(tenant_id, user_id, row.id, "archive", {"status": "archived"})
         return {"memory_id": row.id, "status": "archived"}
 
     def desensitize(self, tenant_id: str, user_id: str, memory_id: str) -> dict[str, Any]:
+        self.require_item(tenant_id, user_id, memory_id, write=True)
         row = self.resources.get("memory_items", tenant_id, memory_id)
         result = SecurityService.desensitize({"text": row.description})
         updated = self.resources.update("memory_items", tenant_id, user_id, memory_id, {"description": result["text"], "spec": {**(row.spec or {}), "desensitized": True}})
@@ -268,13 +305,13 @@ class MemoryService:
     def _visible(row: Any, spec: dict[str, Any], user_id: str, agent_id: str, session_id: str, team_id: str, include_shared: bool) -> bool:
         scope = str(spec.get("scope") or "")
         if scope == "session":
-            return bool(session_id and (row.session_id == session_id or spec.get("session_id") == session_id))
+            return bool(row.user_id == user_id and session_id and (row.session_id == session_id or spec.get("session_id") == session_id))
         if scope == "user":
             return bool(row.user_id == user_id or spec.get("subject_user_id") == user_id)
         if scope == "agent":
             return bool(agent_id and (row.agent_id == agent_id or spec.get("agent_id") == agent_id))
         if scope == "team":
-            return bool(team_id and (row.parent_id == team_id or spec.get("team_id") == team_id))
+            return bool(include_shared and team_id and (row.parent_id == team_id or spec.get("team_id") == team_id))
         if scope in {"tenant", "global", "shared"} or spec.get("shared"):
             return include_shared
         return include_shared if not scope else False

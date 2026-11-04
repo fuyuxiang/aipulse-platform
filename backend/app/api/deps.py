@@ -26,6 +26,7 @@ def get_current_user(
     auth = AuthService(db)
     if api_key:
         user = auth.authenticate_api_key(api_key)
+        request.state.api_key_scopes = auth.api_key_scopes
     else:
         if not authorization or not authorization.lower().startswith("bearer "):
             raise AppError(ErrorCode.UNAUTHORIZED, "missing bearer token", 401)
@@ -51,10 +52,23 @@ def get_tenant_id(current_user: CurrentUserDep, x_tenant_id: Annotated[str | Non
 TenantIdDep = Annotated[str, Depends(get_tenant_id)]
 
 
-def require_permission(permission: str) -> Callable[[DbSession, CurrentUserDep], User]:
-    def dependency(db: DbSession, current_user: CurrentUserDep) -> User:
+def require_permission(permission: str) -> Callable[..., User]:
+    def dependency(request: Request, db: DbSession, current_user: CurrentUserDep) -> User:
+        scopes = getattr(request.state, "api_key_scopes", None)
+        if scopes is not None and not any(p in scopes for p in ("*", permission, permission.split(":")[0] + ":*")):
+            raise AppError(ErrorCode.FORBIDDEN, "api key scope denied", 403)
         RBACService(AuthService(db)).require(current_user, permission)
         return current_user
 
     return dependency
 
+
+
+def require_platform_admin(request: Request, current_user: CurrentUserDep) -> User:
+    scopes = getattr(request.state, "api_key_scopes", None)
+    action = "read" if request.method == "GET" else "write"
+    if scopes is not None and not any(code in scopes for code in ("*", "tenants:*", f"tenants:{action}")):
+        raise AppError(ErrorCode.FORBIDDEN, "api key scope denied", 403)
+    if not current_user.is_superuser:
+        raise AppError(ErrorCode.FORBIDDEN, "platform administrator required", 403)
+    return current_user

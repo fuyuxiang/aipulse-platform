@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
+from sqlalchemy import select
+from app.models.core import UserRole
+from app.core.constants import ErrorCode
+from app.core.errors import AppError
+from app.services.settings.role_service import RoleService
 from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
@@ -31,6 +36,8 @@ def _user(row: User) -> dict[str, object]:
 
 @router.post("")
 def create_user(payload: UserCreate, tenant_id: TenantIdDep, db: Session = Depends(get_db), user: User = Depends(require_permission("users:write"))) -> dict[str, object]:
+    if payload.is_superuser and not user.is_superuser:
+        raise AppError(ErrorCode.FORBIDDEN, "only platform administrators can grant superuser", 403)
     values = payload.model_dump(exclude={"password"})
     values.update({"tenant_id": tenant_id, "password_hash": hash_password(payload.password), "created_by": user.id, "updated_by": user.id})
     row = SQLAlchemyRepository(db, User).create(values)
@@ -54,6 +61,8 @@ def get_user(user_id: str, tenant_id: TenantIdDep, db: Session = Depends(get_db)
 def update_user(user_id: str, payload: UserUpdate, tenant_id: TenantIdDep, db: Session = Depends(get_db), actor: User = Depends(require_permission("users:write"))) -> dict[str, object]:
     repo = SQLAlchemyRepository(db, User)
     row = repo.get(user_id, tenant_id)
+    if not actor.is_superuser and (row.is_superuser or payload.is_superuser):
+        raise AppError(ErrorCode.FORBIDDEN, "only platform administrators can manage superusers", 403)
     before = _user(row)
     row = repo.update(row, {**payload.model_dump(exclude_unset=True), "updated_by": actor.id})
     AuditService(db).record(tenant_id=tenant_id, user_id=actor.id, action="update", resource_type="users", resource_id=row.id, before_data=before, after_data=_user(row))
@@ -65,7 +74,23 @@ def update_user(user_id: str, payload: UserUpdate, tenant_id: TenantIdDep, db: S
 def delete_user(user_id: str, tenant_id: TenantIdDep, db: Session = Depends(get_db), actor: User = Depends(require_permission("users:write"))) -> dict[str, str]:
     repo = SQLAlchemyRepository(db, User)
     row = repo.get(user_id, tenant_id)
+    if row.is_superuser and not actor.is_superuser:
+        raise AppError(ErrorCode.FORBIDDEN, "only platform administrators can manage superusers", 403)
     repo.soft_delete(row, actor.id)
     AuditService(db).record(tenant_id=tenant_id, user_id=actor.id, action="delete", resource_type="users", resource_id=user_id)
     db.commit()
     return {"id": user_id, "status": "deleted"}
+
+
+@router.get("/{user_id}/roles")
+def user_roles(user_id: str, tenant_id: TenantIdDep, db: Session = Depends(get_db), _: User = Depends(require_permission("roles:read"))) -> dict[str, object]:
+    SQLAlchemyRepository(db, User).get(user_id, tenant_id)
+    return {"role_ids": list(db.scalars(select(UserRole.role_id).where(UserRole.tenant_id == tenant_id, UserRole.user_id == user_id)))}
+
+
+@router.put("/{user_id}/roles")
+def set_user_roles(user_id: str, tenant_id: TenantIdDep, role_ids: list[str] = Body(), db: Session = Depends(get_db), actor: User = Depends(require_permission("roles:write"))) -> dict[str, object]:
+    RoleService(db).set_user_roles(tenant_id, user_id, role_ids)
+    AuditService(db).record(tenant_id=tenant_id, user_id=actor.id, action="set_roles", resource_type="users", resource_id=user_id, after_data={"role_ids": role_ids})
+    db.commit()
+    return {"user_id": user_id, "role_ids": role_ids}

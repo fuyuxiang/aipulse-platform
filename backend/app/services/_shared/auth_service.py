@@ -67,7 +67,7 @@ class AuthService:
         self._ensure_not_revoked(payload["jti"], payload["tenant_id"])
         user = self.db.get(User, payload["sub"])
         tenant = self.db.get(Tenant, payload["tenant_id"])
-        if user is None or tenant is None:
+        if user is None or tenant is None or not user.is_active or user.deleted_at is not None or tenant.status != "active":
             raise AppError(ErrorCode.UNAUTHORIZED, "token principal not found", 401)
         self.audit.record(tenant_id=tenant.id, user_id=user.id, action="refresh_token", resource_type="users", resource_id=user.id)
         self.db.commit()
@@ -94,6 +94,9 @@ class AuthService:
         payload = decode_token(token, "access")
         self._ensure_not_revoked(payload["jti"], payload["tenant_id"])
         user = self.db.get(User, payload["sub"])
+        tenant = self.db.get(Tenant, payload["tenant_id"])
+        if tenant is None or tenant.status != "active" or tenant.deleted_at is not None:
+            raise AppError(ErrorCode.UNAUTHORIZED, "inactive tenant", 401)
         if user is None or not user.is_active or user.deleted_at is not None:
             raise AppError(ErrorCode.UNAUTHORIZED, "inactive user", 401)
         return user
@@ -104,8 +107,14 @@ class AuthService:
         if row is None:
             raise AppError(ErrorCode.UNAUTHORIZED, "invalid api key", 401)
         user = self.db.get(User, row.user_id)
-        if user is None:
-            raise AppError(ErrorCode.UNAUTHORIZED, "api key owner not found", 401)
+        if user is None or not user.is_active or user.deleted_at is not None or user.tenant_id != row.tenant_id:
+            raise AppError(ErrorCode.UNAUTHORIZED, "api key owner not found or inactive", 401)
+        if row.expires_at and row.expires_at.replace(tzinfo=utcnow().tzinfo) <= utcnow():
+            raise AppError(ErrorCode.UNAUTHORIZED, "api key expired", 401)
+        tenant = self.db.get(Tenant, row.tenant_id)
+        if tenant is None or tenant.status != "active" or tenant.deleted_at is not None:
+            raise AppError(ErrorCode.UNAUTHORIZED, "inactive tenant", 401)
+        self.api_key_scopes = list(row.scopes or [])
         row.last_used_at = utcnow()
         self.db.commit()
         return user
@@ -114,6 +123,7 @@ class AuthService:
         raw = f"ak_{secrets.token_urlsafe(32)}"
         row = APIKey(tenant_id=tenant_id, user_id=user_id, name=name, key_hash=hash_secret(raw), scopes=scopes, created_by=user_id, updated_by=user_id)
         self.db.add(row)
+        self.db.flush()
         self.audit.record(tenant_id=tenant_id, user_id=user_id, action="create_api_key", resource_type="api_keys", resource_id=row.id)
         self.db.commit()
         return {"id": row.id, "api_key": raw}
@@ -125,7 +135,10 @@ class AuthService:
             select(Permission.code)
             .join(RolePermission, RolePermission.permission_id == Permission.id)
             .join(UserRole, UserRole.role_id == RolePermission.role_id)
-            .where(UserRole.user_id == user.id, Permission.tenant_id == user.tenant_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == user.id, Permission.tenant_id == user.tenant_id,
+                   UserRole.tenant_id == user.tenant_id, RolePermission.tenant_id == user.tenant_id,
+                   Role.tenant_id == user.tenant_id, Role.deleted_at.is_(None), Permission.deleted_at.is_(None))
         )
         return list(self.db.scalars(stmt).all())
 

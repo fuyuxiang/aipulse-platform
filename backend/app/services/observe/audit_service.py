@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.redaction import redact_credentials
 from app.core.tracing import current_trace_id
 from app.models.core import AuditLog
 
@@ -36,6 +37,8 @@ class AuditService:
         ip_address: str = "",
         user_agent: str = "",
     ) -> AuditLog:
+        before_data = redact_credentials(json.loads(_stable_json(before_data or {})))
+        after_data = redact_credentials(json.loads(_stable_json(after_data or {})))
         previous = self.db.scalar(select(AuditLog).where(AuditLog.tenant_id == tenant_id).order_by(AuditLog.created_at.desc()))
         previous_hash = previous.hash if previous else ""
         body = {

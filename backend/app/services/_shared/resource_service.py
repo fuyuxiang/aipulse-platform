@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.constants import ErrorCode
 from app.core.errors import AppError
+from app.core.redaction import redact_credentials
 from app.repositories.resources import ResourceRepository
 from app.schemas.common import ActionResponse, ResourceCreate, ResourceUpdate
 from app.services.observe.audit_service import AuditService
+from app.services.settings.role_service import RoleService
 
 
 class ResourceService:
@@ -33,12 +35,19 @@ class ResourceService:
         if metadata is not None:
             values["metadata_json"] = metadata
         values = self._prepare_sensitive_values(table, values)
+        if table in {"user_roles", "role_permissions"}:
+            RoleService(self.db).validate_binding(table, tenant_id, values)
+        role_permissions = (values.get("config") or {}).get("permissions") if table == "roles" else None
+        if table == "roles":
+            values["data_scope"] = (values.get("config") or {}).get("scope", values.get("data_scope", "tenant"))
         values["tenant_id"] = tenant_id
         values["created_by"] = user_id
         values["updated_by"] = user_id
         repo = ResourceRepository.for_table(self.db, table)
         values = {key: value for key, value in values.items() if hasattr(repo.model, key)}
         row = repo.create(values)
+        if role_permissions is not None:
+            RoleService(self.db).set_permissions(tenant_id, row, role_permissions)
         self.audit.record(tenant_id=tenant_id, user_id=user_id, action="create", resource_type=table, resource_id=row.id, after_data=self.to_dict(row))
         self._evaluate_alert_rules(table, tenant_id, user_id, row)
         self.db.commit()
@@ -52,7 +61,19 @@ class ResourceService:
         metadata = values.pop("metadata", None)
         if metadata is not None:
             values["metadata_json"] = metadata
+        from app.core.redaction import restore_redacted_credentials
+        for field in ("config", "spec", "metadata_json"):
+            if field in values:
+                values[field] = restore_redacted_credentials(values[field], getattr(row, field, None))
         values = self._prepare_sensitive_values(table, values)
+        if table in {"user_roles", "role_permissions"}:
+            RoleService(self.db).validate_binding(table, tenant_id, {**self.to_dict(row), **values})
+        if table == "roles" and "config" in values:
+            config = values["config"] or {}
+            if "permissions" in config:
+                RoleService(self.db).set_permissions(tenant_id, row, config["permissions"])
+            if "scope" in config:
+                values["data_scope"] = config["scope"]
         values["updated_by"] = user_id
         values = {key: value for key, value in values.items() if hasattr(repo.model, key)}
         row = repo.update(row, values)
@@ -132,7 +153,7 @@ class ResourceService:
             if hasattr(value, "isoformat"):
                 value = value.isoformat()
             data[column.name] = value
-        return data
+        return redact_credentials(data)
 
     def require_embedding_dimensions(self, kb: Any, embedding: Sequence[float]) -> None:
         expected = int((kb.config or {}).get("embedding_dimensions") or 0)
@@ -166,7 +187,7 @@ class ResourceService:
         for key in list(payload):
             if any(token in key.lower() for token in ("secret", "password", "token", "api_key", "apikey")):
                 value = str(payload.get(key) or "")
-                if key.endswith("_ref") or key.endswith("_id"):
+                if key.endswith(("_ref", "_id", "_env")):
                     continue
                 payload[key] = "***" if value else ""
         return payload

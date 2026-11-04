@@ -16,6 +16,7 @@ DOMAINS = [
     "roles",
     "permissions",
     "agents",
+    "chat",
     "workflows",
     "models",
     "model-routing",
@@ -32,31 +33,30 @@ DOMAINS = [
 ]
 
 
+def initialize_tenant_rbac(db: Session, tenant_id: str, actor_id: str) -> None:
+    role = db.scalar(select(Role).where(Role.tenant_id == tenant_id, Role.code == "admin", Role.deleted_at.is_(None)))
+    if role is None:
+        role = Role(tenant_id=tenant_id, code="admin", name="租户管理员", created_by=actor_id, updated_by=actor_id)
+        db.add(role)
+        db.flush()
+    for domain in DOMAINS:
+        for action in (["read", "write", "approve", "*"] if domain in {"tools", "workflows"} else ["read", "write", "*"]):
+            code = f"{domain}:{action}"
+            permission = db.scalar(select(Permission).where(Permission.tenant_id == tenant_id, Permission.code == code))
+            if permission is None:
+                permission = Permission(tenant_id=tenant_id, code=code, name=code, resource_type=domain, action=action, created_by=actor_id, updated_by=actor_id)
+                db.add(permission)
+                db.flush()
+            if db.scalar(select(RolePermission).where(RolePermission.tenant_id == tenant_id, RolePermission.role_id == role.id, RolePermission.permission_id == permission.id)) is None:
+                db.add(RolePermission(tenant_id=tenant_id, role_id=role.id, permission_id=permission.id, created_by=actor_id, updated_by=actor_id))
+
+
 def initialize_defaults(db: Session) -> dict[str, str]:
     ids = ensure_default_identity(db)
     tenant = db.get(Tenant, ids["tenant_id"])
     assert tenant is not None
-    admin_role = db.scalar(select(Role).where(Role.tenant_id == tenant.id, Role.code == "admin"))
-    assert admin_role is not None
-    for domain in DOMAINS:
-        for action in ["read", "write", "*"]:
-            code = f"{domain}:{action}"
-            permission = db.scalar(select(Permission).where(Permission.tenant_id == tenant.id, Permission.code == code))  # type: ignore[arg-type]
-            if permission is None:
-                permission = Permission(
-                    tenant_id=tenant.id,
-                    code=code,
-                    name=code,
-                    permission_type="api",
-                    resource_type=domain,
-                    action=action,
-                    created_by=ids["user_id"],
-                    updated_by=ids["user_id"],
-                )
-                db.add(permission)
-                db.flush()
-            if db.scalar(select(RolePermission).where(RolePermission.tenant_id == tenant.id, RolePermission.role_id == admin_role.id, RolePermission.permission_id == permission.id)) is None:  # type: ignore[arg-type]
-                db.add(RolePermission(tenant_id=tenant.id, role_id=admin_role.id, permission_id=permission.id, created_by=ids["user_id"], updated_by=ids["user_id"]))
+    for tenant_id in db.scalars(select(Tenant.id).where(Tenant.deleted_at.is_(None))):
+        initialize_tenant_rbac(db, tenant_id, ids["user_id"])
     db.commit()
     service = ResourceService(db)
     provider_rows, provider_total = service.list("model_providers", tenant.id, 1, 1, {"code": "echo-agent-native"})

@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResourceCreate(BaseModel):
+    role_id: str = ""
+    permission_id: str = ""
+    data_scope: str = "tenant"
     name: str = ""
     code: str = ""
     description: str = ""
@@ -39,6 +42,9 @@ class ResourceCreate(BaseModel):
 
 
 class ResourceUpdate(BaseModel):
+    role_id: str | None = None
+    permission_id: str | None = None
+    data_scope: str | None = None
     name: str | None = None
     code: str | None = None
     description: str | None = None
@@ -75,6 +81,9 @@ class ResourceRead(BaseModel):
 
     id: str
     tenant_id: str
+    role_id: str = ""
+    permission_id: str = ""
+    data_scope: str = "tenant"
     name: str = ""
     code: str = ""
     description: str = ""

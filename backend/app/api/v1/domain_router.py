@@ -4,7 +4,10 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
+from app.models.core import Role
+from app.services.settings.role_service import RoleService
+from app.services.build.memory_service import MemoryService
 
 from app.api.deps import get_db, get_tenant_id, require_permission
 from app.core.response import ListResponse
@@ -14,7 +17,11 @@ from app.services._shared.resource_service import ResourceService
 
 
 def _read(row: Any) -> ResourceRead:
-    data = {column.name: getattr(row, column.name) for column in row.__table__.columns}
+    data = ResourceService.to_dict(row)
+    if isinstance(row, Role):
+        session = object_session(row)
+        assert session is not None
+        data["config"] = RoleService(session).read(row)
     return ResourceRead.model_validate(data)
 
 
@@ -26,6 +33,10 @@ def add_crud_routes(router: APIRouter, *, table: str, prefix: str, permission: s
         tenant_id: str = Depends(get_tenant_id),
         user: User = Depends(require_permission(f"{permission}:write")),
     ) -> ResourceRead:
+        if table == "memory_items":
+            values = payload.model_dump()
+            values["user_id"] = user.id
+            return _read(ResourceService(db).create(table, tenant_id, user.id, values))
         return _read(ResourceService(db).create(table, tenant_id, user.id, payload))
 
     @router.get(prefix, response_model=ListResponse[ResourceRead])
@@ -36,9 +47,14 @@ def add_crud_routes(router: APIRouter, *, table: str, prefix: str, permission: s
         status: str = "",
         db: Session = Depends(get_db),
         tenant_id: str = Depends(get_tenant_id),
-        _: User = Depends(require_permission(f"{permission}:read")),
+        user: User = Depends(require_permission(f"{permission}:read")),
     ) -> ListResponse[ResourceRead]:
-        rows, total = ResourceService(db).list(table, tenant_id, page, page_size, {"name": name, "status": status})
+        if table == "memory_items" and not user.is_superuser:
+            candidates, _ = ResourceService(db).list(table, tenant_id, 1, 10000, {"name": name, "status": status})
+            visible = [row for row in candidates if MemoryService(db).can_read(row, user.id)]
+            rows, total = visible[(page - 1) * page_size:page * page_size], len(visible)
+        else:
+            rows, total = ResourceService(db).list(table, tenant_id, page, page_size, {"name": name, "status": status})
         return ListResponse(items=[_read(row) for row in rows], total=total, page=page, page_size=page_size)
 
     @router.get(f"{prefix}/{{item_id}}", response_model=ResourceRead)
@@ -46,8 +62,10 @@ def add_crud_routes(router: APIRouter, *, table: str, prefix: str, permission: s
         item_id: str,
         db: Session = Depends(get_db),
         tenant_id: str = Depends(get_tenant_id),
-        _: User = Depends(require_permission(f"{permission}:read")),
+        user: User = Depends(require_permission(f"{permission}:read")),
     ) -> ResourceRead:
+        if table == "memory_items":
+            return _read(MemoryService(db).require_item(tenant_id, user.id, item_id))
         return _read(ResourceService(db).get(table, tenant_id, item_id))
 
     @router.put(f"{prefix}/{{item_id}}", response_model=ResourceRead)
@@ -58,6 +76,11 @@ def add_crud_routes(router: APIRouter, *, table: str, prefix: str, permission: s
         tenant_id: str = Depends(get_tenant_id),
         user: User = Depends(require_permission(f"{permission}:write")),
     ) -> ResourceRead:
+        if table == "memory_items":
+            MemoryService(db).require_item(tenant_id, user.id, item_id, write=True)
+            values = payload.model_dump(exclude_unset=True)
+            values.pop("user_id", None)
+            return _read(ResourceService(db).update(table, tenant_id, user.id, item_id, values))
         return _read(ResourceService(db).update(table, tenant_id, user.id, item_id, payload))
 
     @router.delete(f"{prefix}/{{item_id}}")
@@ -67,6 +90,8 @@ def add_crud_routes(router: APIRouter, *, table: str, prefix: str, permission: s
         tenant_id: str = Depends(get_tenant_id),
         user: User = Depends(require_permission(f"{permission}:write")),
     ) -> dict[str, str]:
+        if table == "memory_items":
+            MemoryService(db).require_item(tenant_id, user.id, item_id, write=True)
         return ResourceService(db).delete(table, tenant_id, user.id, item_id)
 
 
@@ -117,7 +142,7 @@ def add_list_route(
         page_size: int = Query(20, ge=1, le=200),
         db: Session = Depends(get_db),
         tenant_id: str = Depends(get_tenant_id),
-        _: User = Depends(require_permission(f"{permission}:read")),
+        user: User = Depends(require_permission(f"{permission}:read")),
     ) -> ListResponse[ResourceRead]:
         filters = filters_from_path(request) if filters_from_path else {}
         rows, total = ResourceService(db).list(table, tenant_id, page, page_size, filters)
