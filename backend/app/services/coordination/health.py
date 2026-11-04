@@ -6,7 +6,6 @@ by reassigning tasks from unhealthy agents to healthy alternatives.
 
 from __future__ import annotations
 
-import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field

@@ -25,10 +25,11 @@ def list_teams(
     tenant_id: TenantIdDep,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: User = Depends(require_permission("agents:read")),
+    name: str = "",
+    user: User = Depends(require_permission("agents:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    items, total = MultiAgentService(db).list_teams(tenant_id, page, page_size)
+    items, total = MultiAgentService(db).list_teams(tenant_id, page, page_size, user.id, name)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -36,10 +37,10 @@ def list_teams(
 def get_team(
     team_id: str,
     tenant_id: TenantIdDep,
-    _: User = Depends(require_permission("agents:read")),
+    user: User = Depends(require_permission("agents:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return MultiAgentService(db).get_team(tenant_id, team_id)
+    return MultiAgentService(db).get_team(tenant_id, team_id, user.id)
 
 
 @router.put("/agent-teams/{team_id}")
@@ -83,7 +84,14 @@ def update_member(
     user: User = Depends(require_permission("agents:write")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return MultiAgentService(db).update_member(tenant_id, user.id, member_id, dict(payload))
+    service = MultiAgentService(db)
+    service.require_team(tenant_id, user.id, team_id)
+    member = service.resources.get("agent_team_members", tenant_id, member_id)
+    if member.parent_id != team_id:
+        from app.core.constants import ErrorCode
+        from app.core.errors import AppError
+        raise AppError(ErrorCode.NOT_FOUND, "team member not found", 404)
+    return service.update_member(tenant_id, user.id, member_id, dict(payload))
 
 
 @router.delete("/agent-teams/{team_id}/members/{member_id}")
@@ -114,10 +122,10 @@ def list_team_runs(
     tenant_id: TenantIdDep,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: User = Depends(require_permission("agents:read")),
+    user: User = Depends(require_permission("agents:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    items, total = MultiAgentService(db).list_team_runs(tenant_id, team_id, page, page_size)
+    items, total = MultiAgentService(db).list_team_runs(tenant_id, team_id, page, page_size, user.id)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -125,7 +133,7 @@ def list_team_runs(
 def get_team_run(
     run_id: str,
     tenant_id: TenantIdDep,
-    _: User = Depends(require_permission("agents:read")),
+    user: User = Depends(require_permission("agents:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return MultiAgentService(db).get_team_run(tenant_id, run_id)
+    return MultiAgentService(db).get_team_run(tenant_id, run_id, user.id)

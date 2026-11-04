@@ -199,6 +199,8 @@ class ConflictResolver:
             "Respond with ONLY one word: none, low, medium, or high."
         )
         try:
+            if self._llm is None:
+                raise ValueError("LLM callback is not configured")
             result = await self._llm("system", prompt)
             result = result.strip().lower()
             severity_map = {

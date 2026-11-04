@@ -236,6 +236,8 @@ class DelegationEngine:
             "Return ONLY the JSON array, no other text."
         )
         try:
+            if self._llm is None:
+                raise ValueError("LLM callback is not configured")
             result = await self._llm("system", prompt)
             return self._parse_llm_tasks(result)
         except Exception:
