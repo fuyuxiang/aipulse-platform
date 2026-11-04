@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import json
 import csv
 import re
 import sys
@@ -15,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.constants import ErrorCode
 from app.core.errors import AppError
-from app.services.settings.model_services import deterministic_embedding
+from app.services.settings.model_services import deterministic_embedding, ModelInvocationService
 from app.services._shared.resource_service import ResourceService
 
 project_root = settings.project_root
@@ -32,7 +34,7 @@ class KnowledgeService:
         self.object_store = LocalObjectStore(settings.resolve_path(settings.object_store_dir))
         self.vector_root = settings.resolve_path(settings.vector_store_dir)
 
-    def upload_document(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def upload_document(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         kb = self.resources.get("knowledge_bases", tenant_id, kb_id)
         filename = self._safe_filename(str(payload.get("filename") or payload.get("name") or "document.txt"))
         data = self._payload_bytes(payload)
@@ -64,7 +66,7 @@ class KnowledgeService:
         )
         if payload.get("auto_index", True):
             self.parse_document(tenant_id, user_id, document.id)
-            self.reindex_document(tenant_id, user_id, document.id)
+            await self.reindex_document(tenant_id, user_id, document.id)
             document = self.resources.get("knowledge_documents", tenant_id, document.id)
         return ResourceService.to_dict(document)
 
@@ -112,7 +114,7 @@ class KnowledgeService:
         self.resources.update("knowledge_documents", tenant_id, user_id, document.id, {"status": "parsed"})
         return {"job_id": job.id, "document_id": document.id, "chunk_ids": created_chunks, "chunk_count": len(created_chunks), "status": "completed"}
 
-    def reindex_document(self, tenant_id: str, user_id: str, document_id: str) -> dict[str, Any]:
+    async def reindex_document(self, tenant_id: str, user_id: str, document_id: str) -> dict[str, Any]:
         document = self.resources.get("knowledge_documents", tenant_id, document_id)
         kb = self.resources.get("knowledge_bases", tenant_id, document.knowledge_base_id)
         chunks, total = self.resources.list("knowledge_chunks", tenant_id, 1, 1000, {"parent_id": document.id})
@@ -121,13 +123,15 @@ class KnowledgeService:
             chunks, total = self.resources.list("knowledge_chunks", tenant_id, 1, 1000, {"parent_id": document.id})
         dimensions = int((kb.config or {}).get("embedding_dimensions") or 128)
         embedding_model_id = str((kb.config or {}).get("embedding_model_id") or "")
+        space = self._embedding_space(tenant_id, kb)
+        self._check_space(tenant_id, kb, space)
         vector_documents: list[dict[str, Any]] = []
         for chunk in chunks:
             text = str((chunk.spec or {}).get("text") or "")
-            vector = deterministic_embedding(text, dimensions)
+            vector = (await self._embed(tenant_id, user_id, kb, [text]))[0]
             self.resources.require_embedding_dimensions(kb, vector)
             vector_id = f"{document.id}:{chunk.id}"
-            metadata = {"tenant_id": tenant_id, "knowledge_base_id": kb.id, "document_id": document.id, "chunk_id": chunk.id}
+            metadata = {"tenant_id": tenant_id, "knowledge_base_id": kb.id, "document_id": document.id, "chunk_id": chunk.id, "filename": document.name, "embedding_space": space}
             vector_documents.append({"id": vector_id, "text": text, "vector": vector, "metadata": metadata})
             self.resources.create(
                 "knowledge_embeddings",
@@ -161,12 +165,12 @@ class KnowledgeService:
         self.resources.update("knowledge_documents", tenant_id, user_id, document.id, {"status": "indexed"})
         return {"index_id": index.id, "document_id": document.id, "chunk_count": total, "vector_count": len(vector_documents), "status": "completed"}
 
-    def rebuild_index(self, tenant_id: str, user_id: str, kb_id: str) -> dict[str, Any]:
+    async def rebuild_index(self, tenant_id: str, user_id: str, kb_id: str) -> dict[str, Any]:
         kb = self.resources.get("knowledge_bases", tenant_id, kb_id)
         documents, total = self.resources.list("knowledge_documents", tenant_id, 1, 1000, {"knowledge_base_id": kb.id})
         store = self._store(tenant_id, kb.id)
         store.rebuild_index([])
-        indexed = [self.reindex_document(tenant_id, user_id, document.id) for document in documents]
+        indexed = [await self.reindex_document(tenant_id, user_id, document.id) for document in documents]
         job = self.resources.create(
             "knowledge_rebuild_jobs",
             tenant_id,
@@ -175,21 +179,21 @@ class KnowledgeService:
         )
         return {"job_id": job.id, "knowledge_base_id": kb.id, "documents": total, "status": "completed", "indexed": indexed}
 
-    def retrieve(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def retrieve(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         kb = self.resources.get("knowledge_bases", tenant_id, kb_id)
         query = str(payload.get("query") or payload.get("text") or "")
         if not query.strip():
             raise AppError(ErrorCode.VALIDATION_ERROR, "query is required", 422)
         top_k = int(payload.get("top_k") or 5)
         score_threshold = float(payload.get("score_threshold") or 0)
-        dimensions = int((kb.config or {}).get("embedding_dimensions") or 128)
         metadata_filter = dict(payload.get("metadata_filter") or {})
         metadata_filter.update({"tenant_id": tenant_id, "knowledge_base_id": kb.id})
-        query_vector = deterministic_embedding(query, dimensions)
+        self._check_space(tenant_id, kb, self._embedding_space(tenant_id, kb))
+        query_vector = (await self._embed(tenant_id, user_id, kb, [query]))[0]
         mode = str(payload.get("mode") or "hybrid")
         store = self._store(tenant_id, kb.id)
         if payload.get("auto_index", True):
-            self._ensure_indexed(tenant_id, user_id, kb.id)
+            await self._ensure_indexed(tenant_id, user_id, kb.id)
             store = self._store(tenant_id, kb.id)
         if mode == "vector":
             matches = store.similarity_search(query_vector, top_k=top_k, metadata_filter=metadata_filter)
@@ -200,7 +204,7 @@ class KnowledgeService:
         filtered = [item for item in matches if float(item.get("score", 0)) >= score_threshold]
         rerank_model_id = str(payload.get("rerank_model_id") or (kb.config or {}).get("rerank_model_id") or "")
         if payload.get("rerank") and rerank_model_id:
-            filtered = self._rerank(query, filtered, top_k)
+            filtered = await self._model_rerank(tenant_id, user_id, rerank_model_id, query, filtered, top_k)
         log = self.resources.create(
             "knowledge_retrieval_logs",
             tenant_id,
@@ -215,16 +219,16 @@ class KnowledgeService:
                 "spec": {"embedding_model_id": (kb.config or {}).get("embedding_model_id"), "rerank_model_id": rerank_model_id, "mode": mode},
             },
         )
-        return {"log_id": log.id, "knowledge_base_id": kb.id, "query": query, "matches": filtered, "total": len(filtered)}
+        return {"log_id": log.id, "knowledge_base_id": kb.id, "query": query, "matches": filtered, "total": len(filtered), "embedding_space": self._embedding_space(tenant_id, kb)}
 
-    def build_context(self, tenant_id: str, user_id: str, kb_ids: list[str], query: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def build_context(self, tenant_id: str, user_id: str, kb_ids: list[str], query: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
         top_k = int(payload.get("top_k") or 4)
         per_kb = max(1, int(payload.get("per_kb") or top_k))
         sources: list[dict[str, Any]] = []
         retrieval_logs: list[str] = []
         for kb_id in [str(item) for item in kb_ids if str(item)]:
-            result = self.retrieve(
+            result = await self.retrieve(
                 tenant_id,
                 user_id,
                 kb_id,
@@ -259,11 +263,11 @@ class KnowledgeService:
             lines.append(f"[K{index}] {title}\n{source.get('content', '')}")
         return {"sources": sources, "retrieval_log_ids": retrieval_logs, "context_text": "\n\n".join(lines), "total": len(sources)}
 
-    def rerank(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def rerank(self, tenant_id: str, user_id: str, kb_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         kb = self.resources.get("knowledge_bases", tenant_id, kb_id)
         query = str(payload.get("query") or "")
         documents = payload.get("documents") or []
-        ranked = self._rerank(query, [{"id": str(index), "text": str(document), "score": 0.0, "metadata": {}} for index, document in enumerate(documents)], int(payload.get("top_n") or len(documents) or 1))
+        ranked = await self._model_rerank(tenant_id, user_id, str((kb.config or {}).get("rerank_model_id") or ""), query, [{"id": str(index), "text": str(document), "score": 0.0, "metadata": {}} for index, document in enumerate(documents)], int(payload.get("top_n") or len(documents) or 1))
         log = self.resources.create(
             "knowledge_retrieval_logs",
             tenant_id,
@@ -271,6 +275,43 @@ class KnowledgeService:
             {"name": "knowledge rerank", "status": "success", "knowledge_base_id": kb.id, "input_payload": payload, "output_payload": {"ranked": ranked}},
         )
         return {"log_id": log.id, "ranked": ranked}
+
+    def _embedding_space(self, tenant_id: str, kb: Any) -> str:
+        model_id = str((kb.config or {}).get("embedding_model_id") or "local")
+        if model_id == "local":
+            return f"demo:hash:{(kb.config or {}).get('embedding_dimensions', 128)}"
+        model = self.resources.get("models", tenant_id, model_id)
+        context = ModelInvocationService(self.resources.db)._resolve_model_context(tenant_id, model)
+        # Configuration changes require a full rebuild; never mix vector spaces.
+        digest = hashlib.sha256(json.dumps(context["config"], sort_keys=True, default=str).encode()).hexdigest()[:16]
+        mode = "demo" if context["provider_type"] in {"local", "echo_agent_native", "aipulse_local"} else "provider"
+        return f"{mode}:{model_id}:{digest}"
+
+    def _check_space(self, tenant_id: str, kb: Any, space: str) -> None:
+        documents = self._store(tenant_id, kb.id).documents.values()
+        for document in documents:
+            stored = (document.get("metadata") or {}).get("embedding_space")
+            if stored != space:
+                raise AppError(ErrorCode.BUSINESS_ERROR, "embedding configuration changed or legacy index; rebuild the entire knowledge index", 409)
+
+    async def _embed(self, tenant_id: str, user_id: str, kb: Any, texts: list[str]) -> list[list[float]]:
+        model_id = str((kb.config or {}).get("embedding_model_id") or "local")
+        if model_id == "local":
+            return [deterministic_embedding(text, int((kb.config or {}).get("embedding_dimensions") or 128)) for text in texts]
+        invocation = await ModelInvocationService(self.resources.db).invoke(tenant_id, user_id, model_id, "embedding", {"texts": texts})
+        vectors = (invocation.get("result") or {}).get("embeddings") or []
+        if len(vectors) != len(texts):
+            raise AppError(ErrorCode.BUSINESS_ERROR, "embedding provider returned an invalid vector count", 502)
+        for vector in vectors:
+            self.resources.require_embedding_dimensions(kb, vector)
+        return vectors
+
+    async def _model_rerank(self, tenant_id: str, user_id: str, model_id: str, query: str, matches: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
+        if not model_id:
+            return self._rerank(query, matches, top_k)
+        invocation = await ModelInvocationService(self.resources.db).invoke(tenant_id, user_id, model_id, "rerank", {"query": query, "documents": [m.get("text", "") for m in matches], "top_n": top_k})
+        ranked = (invocation.get("result") or {}).get("results") or (invocation.get("result") or {}).get("ranked") or (invocation.get("result") or {}).get("rankings") or []
+        return [{**matches[int(item["index"])], "rerank_score": item.get("relevance_score", item.get("score", 0))} for item in ranked[:top_k]]
 
     def stats(self, tenant_id: str, kb_id: str) -> dict[str, Any]:
         kb = self.resources.get("knowledge_bases", tenant_id, kb_id)
@@ -285,11 +326,11 @@ class KnowledgeService:
     def _store_path(self, tenant_id: str, kb_id: str) -> Path:
         return self.vector_root / tenant_id / f"{kb_id}.json"
 
-    def _ensure_indexed(self, tenant_id: str, user_id: str, kb_id: str) -> None:
+    async def _ensure_indexed(self, tenant_id: str, user_id: str, kb_id: str) -> None:
         documents, _ = self.resources.list("knowledge_documents", tenant_id, 1, 1000, {"knowledge_base_id": kb_id})
         for document in documents:
             if document.status != "indexed":
-                self.reindex_document(tenant_id, user_id, document.id)
+                await self.reindex_document(tenant_id, user_id, document.id)
 
     @staticmethod
     def _safe_filename(filename: str) -> str:

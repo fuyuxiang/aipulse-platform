@@ -19,14 +19,14 @@ add_action_route(router, method="post", path="/knowledge-bases/{kb_id}/permissio
 
 
 @router.post("/knowledge-bases/{kb_id}/documents")
-def upload_document(
+async def upload_document(
     kb_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
     user: User = Depends(require_permission("knowledge:write")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return KnowledgeService(db).upload_document(tenant_id, user.id, kb_id, dict(payload))
+    return await KnowledgeService(db).upload_document(tenant_id, user.id, kb_id, dict(payload))
 
 
 @router.get("/knowledge-bases/{kb_id}/documents", response_model=ListResponse[ResourceRead])
@@ -84,35 +84,35 @@ def document_chunks(
 
 
 @router.post("/knowledge-documents/{document_id}/reindex")
-def reindex_document(document_id: str, tenant_id: TenantIdDep, user: User = Depends(require_permission("knowledge:write")), db: Session = Depends(get_db)) -> dict[str, object]:
-    return KnowledgeService(db).reindex_document(tenant_id, user.id, document_id)
+async def reindex_document(document_id: str, tenant_id: TenantIdDep, user: User = Depends(require_permission("knowledge:write")), db: Session = Depends(get_db)) -> dict[str, object]:
+    return await KnowledgeService(db).reindex_document(tenant_id, user.id, document_id)
 
 
 @router.post("/knowledge-bases/{kb_id}/rebuild-index")
-def rebuild_index(kb_id: str, tenant_id: TenantIdDep, user: User = Depends(require_permission("knowledge:write")), db: Session = Depends(get_db)) -> dict[str, object]:
-    return KnowledgeService(db).rebuild_index(tenant_id, user.id, kb_id)
+async def rebuild_index(kb_id: str, tenant_id: TenantIdDep, user: User = Depends(require_permission("knowledge:write")), db: Session = Depends(get_db)) -> dict[str, object]:
+    return await KnowledgeService(db).rebuild_index(tenant_id, user.id, kb_id)
 
 
 @router.post("/knowledge-bases/{kb_id}/retrieve")
-def retrieve(
+async def retrieve(
     kb_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
     user: User = Depends(require_permission("knowledge:write")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return KnowledgeService(db).retrieve(tenant_id, user.id, kb_id, dict(payload))
+    return await KnowledgeService(db).retrieve(tenant_id, user.id, kb_id, dict(payload))
 
 
 @router.post("/knowledge-bases/{kb_id}/rerank")
-def rerank(
+async def rerank(
     kb_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
     user: User = Depends(require_permission("knowledge:write")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return KnowledgeService(db).rerank(tenant_id, user.id, kb_id, dict(payload))
+    return await KnowledgeService(db).rerank(tenant_id, user.id, kb_id, dict(payload))
 
 
 @router.get("/knowledge-bases/{kb_id}/retrieval-logs", response_model=ListResponse[ResourceRead])

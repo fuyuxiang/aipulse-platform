@@ -24,7 +24,7 @@ class AgentRunnerService:
         self.db = db
         self.resources = ResourceService(db)
 
-    async def run(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def run(self, tenant_id: str, user_id: str, agent_id: str, payload: dict[str, Any], *, config_snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
         started = time.perf_counter()
         agent = self.resources.get("agents", tenant_id, agent_id)
         if not agent.enabled:
@@ -34,7 +34,7 @@ class AgentRunnerService:
         if not prompt.strip():
             raise AppError(ErrorCode.VALIDATION_ERROR, "agent prompt is required", 422)
 
-        config = self._agent_config(agent, payload)
+        config = {**config_snapshot, **{k: v for k, v in payload.items() if k in {"memory_policy", "knowledge_base_ids", "tool_ids", "guardrail_policy_ids"}}} if config_snapshot is not None else self._agent_config(agent, payload)
         run_context: dict[str, Any] = {
             "agent": ResourceService.to_dict(agent),
             "session_id": session_id,
@@ -56,7 +56,7 @@ class AgentRunnerService:
                 raise AppError(ErrorCode.FORBIDDEN, "agent input blocked by guardrails", 403)
             prompt = str(input_check.get("masked_content") or prompt)
 
-            rag_context = self._build_rag_context(tenant_id, user_id, config, prompt)
+            rag_context = await self._build_rag_context(tenant_id, user_id, config, prompt)
             memory_context = self._build_memory_context(tenant_id, user_id, agent_id, session_id, config, prompt)
             run_context["rag"] = rag_context
             run_context["memory"] = memory_context
@@ -71,6 +71,13 @@ class AgentRunnerService:
             else:
                 execution = await self._run_with_runtime(tenant_id, user_id, agent_id, session_id, config, prompt, rag_context, memory_context)
 
+            if execution.get("status") == "waiting_approval":
+                run = self.resources.create("agent_run_records", tenant_id, user_id, {
+                    "name": f"run {agent.name}", "status": "waiting_approval", "agent_id": agent_id, "session_id": session_id,
+                    "model_id": model_id, "input_payload": {"prompt": prompt, "payload": payload},
+                    "output_payload": {**execution, "rag": rag_context}, "token_usage": execution.get("token_usage", {}),
+                    "cost": float(execution.get("cost") or 0)})
+                return {"run_id": run.id, "agent_id": agent_id, "session_id": session_id, "rag": rag_context, **execution}
             response = str(execution.get("response") or "")
             output_check = GuardrailService(self.db).check_output(
                 tenant_id,
@@ -95,7 +102,8 @@ class AgentRunnerService:
                     "response": response,
                     "agent_id": agent_id,
                     "session_id": session_id,
-                    "subject_user_id": payload.get("subject_user_id") or payload.get("user_id") or user_id,
+                    "subject_user_id": user_id,
+                    "team_id": (config.get("memory_policy") or {}).get("team_id", ""),
                     "memory_policy": config.get("memory_policy") or {},
                     "scope": (config.get("memory_policy") or {}).get("write_scope", "session"),
                     "shared": (config.get("memory_policy") or {}).get("shared", False),
@@ -175,14 +183,14 @@ class AgentRunnerService:
                 config[key] = payload[key]
         return config
 
-    def _build_rag_context(self, tenant_id: str, user_id: str, config: dict[str, Any], prompt: str) -> dict[str, Any]:
+    async def _build_rag_context(self, tenant_id: str, user_id: str, config: dict[str, Any], prompt: str) -> dict[str, Any]:
         rag_policy = dict(config.get("rag_policy") or {})
         if rag_policy.get("enabled") is False:
             return {"sources": [], "retrieval_log_ids": [], "context_text": "", "total": 0}
         kb_ids = self._list(config, "knowledge_base_ids")
         if not kb_ids:
             return {"sources": [], "retrieval_log_ids": [], "context_text": "", "total": 0}
-        return KnowledgeService(self.db).build_context(tenant_id, user_id, kb_ids, prompt, rag_policy)
+        return await KnowledgeService(self.db).build_context(tenant_id, user_id, kb_ids, prompt, rag_policy)
 
     def _build_memory_context(self, tenant_id: str, user_id: str, agent_id: str, session_id: str, config: dict[str, Any], prompt: str) -> dict[str, Any]:
         memory_policy = dict(config.get("memory_policy") or {})
@@ -204,7 +212,7 @@ class AgentRunnerService:
 
     def _build_messages(self, agent: Any, config: dict[str, Any], prompt: str, payload: dict[str, Any], rag_context: dict[str, Any], memory_context: dict[str, Any]) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = []
-        system_prompt = str(config.get("system_prompt") or (agent.spec or {}).get("system_prompt") or "")
+        system_prompt = str(config.get("system_prompt", (agent.spec or {}).get("system_prompt", "")))
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         if memory_context.get("context_text"):
@@ -235,10 +243,19 @@ class AgentRunnerService:
                 "temperature": config.get("temperature", 0.7),
                 "max_tokens": config.get("max_tokens", 4096),
                 "tools": [tool["definition"] for tool in tools],
+                "tool_choice": config.get("tool_choice", "auto"),
             },
         )
         result = dict(invocation.get("result") or {})
+        if config.get("tool_choice") == "required" and not result.get("tool_calls"):
+            raise AppError(ErrorCode.BUSINESS_ERROR, "model did not execute the required tool call", 409)
+        total_cost = float(invocation.get("cost") or 0)
+        total_usage = dict(result.get("usage") or {})
         tool_calls = await self._execute_tool_calls(tenant_id, user_id, tools, result.get("tool_calls") or [])
+        waiting = next((call for call in tool_calls if call.get("status") == "waiting_approval"), None)
+        if waiting:
+            return {"status": "waiting_approval", "approval_id": waiting["approval_id"], "tool_calls": tool_calls,
+                    "response": "", "token_usage": total_usage, "cost": total_cost}
         if tool_calls:
             messages.append({"role": "assistant", "content": result.get("content") or "", "tool_calls": result.get("tool_calls") or []})
             for call in tool_calls:
@@ -256,10 +273,15 @@ class AgentRunnerService:
                 },
             )
             result = dict(invocation.get("result") or {})
+            total_cost += float(invocation.get("cost") or 0)
+            for key, value in (result.get("usage") or {}).items():
+                total_usage[key] = total_usage.get(key, 0) + int(value)
+            if result.get("tool_calls"):
+                raise AppError(ErrorCode.BUSINESS_ERROR, "agent tool-call round budget exceeded", 409)
         return {
             "response": result.get("content", ""),
-            "token_usage": result.get("usage", {}),
-            "cost": invocation.get("cost", 0),
+            "token_usage": total_usage,
+            "cost": total_cost,
             "tool_calls": tool_calls,
         }
 
@@ -318,11 +340,15 @@ class AgentRunnerService:
             name = str(function.get("name") or call.get("name") or "")
             tool = tool_by_name.get(name)
             if not tool:
-                continue
+                raise AppError(ErrorCode.FORBIDDEN, f"model requested an unbound tool: {name}", 403)
             arguments = function.get("arguments") or call.get("arguments") or {}
             if isinstance(arguments, str):
                 arguments = json.loads(arguments or "{}")
-            result = await ToolService(self.db).invoke(tenant_id, user_id, str(tool["id"]), {"arguments": dict(arguments), "approved": True})
+            result = await ToolService(self.db).invoke(tenant_id, user_id, str(tool["id"]), {"arguments": dict(arguments)})
+            if result.get("status") == "waiting_approval":
+                executed.append({"id": call.get("id", ""), "name": name, "tool_id": tool["id"], "arguments": arguments,
+                                 "status": "waiting_approval", "approval_id": result["approval_id"]})
+                break
             executed.append({"id": call.get("id", ""), "name": name, "tool_id": tool["id"], "arguments": arguments, "output": result.get("output", {})})
         return executed
 
