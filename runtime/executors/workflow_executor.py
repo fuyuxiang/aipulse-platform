@@ -253,7 +253,7 @@ class WorkflowExecutor:
             )
         except _WorkflowPause:
             pass
-        except Exception as exc:
+        except Exception:
             state.status = WorkflowRunStatus.FAILED
             if state.compensation_stack and compensation_callback:
                 state.status = WorkflowRunStatus.COMPENSATING
@@ -294,13 +294,13 @@ class WorkflowExecutor:
             context=dict(checkpoint.get("context", {})),
             results={
                 nid: NodeResult(node_id=nid, status=NodeStatus(r["status"]), output=r.get("output"))
-                for nid, r in checkpoint.get("results", {}).items()
+                for nid, r in checkpoint.get("results", checkpoint.get("completed_nodes", {})).items()
             },
             compensation_stack=list(checkpoint.get("compensation_stack", [])),
         )
 
         completed = {nid for nid, r in state.results.items() if r.status == NodeStatus.SUCCESS}
-        next_nodes = self._find_next_after_completed(completed, node_map, edge_map, state)
+        next_nodes = self._find_next_after_completed(completed, node_map, edge_map, state) if completed else self._find_start_nodes(nodes, edges)
         deadline = (time.monotonic() + timeout_seconds) if timeout_seconds > 0 else 0
 
         try:
@@ -403,6 +403,7 @@ class WorkflowExecutor:
         node = node_map[node_id]
         node_type = str(node.get("type", ""))
         config = dict(node.get("config", {}))
+        config.setdefault("id", node_id)
         started_at = time.monotonic()
 
         # Handle special node types
@@ -478,6 +479,9 @@ class WorkflowExecutor:
 
         # Execute with optional timeout
         node_timeout = float(config.get("timeout_seconds", 0))
+        if deadline:
+            remaining = max(0.001, deadline - time.monotonic())
+            node_timeout = min(node_timeout, remaining) if node_timeout > 0 else remaining
         try:
             if node_timeout > 0:
                 output = await asyncio.wait_for(
@@ -517,6 +521,7 @@ class WorkflowExecutor:
             node_id=node_id, status=NodeStatus.SUCCESS, output=output,
             started_at=started_at, finished_at=time.monotonic(),
         )
+        state.context[node_id] = output
         if isinstance(output, dict):
             state.context.update(output)
         elif output is not None:
@@ -826,6 +831,8 @@ class WorkflowExecutor:
                         default_edges.append(edge)
                     elif edge_condition == node_output:
                         matched_edges.append(edge)
+                    elif edge_condition in {"true", "false"}:
+                        continue
                     elif edge_condition == "true" and node_output == "true":
                         matched_edges.append(edge)
                     elif edge_condition == "false" and node_output == "false":
@@ -909,19 +916,10 @@ class WorkflowExecutor:
         state: ExecutionState,
     ) -> list[str]:
         """For resume: find nodes that should execute next given completed set."""
-        candidates: set[str] = set()
-        for nid in completed:
-            for edge in edge_map.get(nid, []):
-                target = str(edge["target"])
-                if target not in completed:
-                    candidates.add(target)
-        # Filter to only those whose dependencies are all completed
-        next_nodes: list[str] = []
-        for candidate in candidates:
-            if candidate in state.results and state.results[candidate].status == NodeStatus.SUCCESS:
-                continue
-            next_nodes.append(candidate)
-        return next_nodes
+        ready: deque[str] = deque()
+        for nid in sorted(completed):
+            self._enqueue_successors(nid, edge_map, state, ready)
+        return list(dict.fromkeys(ready))
 
     def _make_checkpoint(self, state: ExecutionState) -> dict[str, Any]:
         """Serialize current state to a checkpoint dict."""

@@ -11,6 +11,7 @@ from app.schemas.common import ResourceRead
 from app.services._shared.resource_service import ResourceService
 from app.services.build.workflow_service import WorkflowService
 from app.websocket.manager import websocket_manager
+from app.websocket.authorization import authorize_run_socket
 
 router = APIRouter(tags=["workflows"])
 
@@ -130,14 +131,14 @@ async def retry_workflow_run(
 
 
 @router.post("/workflow-runs/{run_id}/cancel")
-def cancel_workflow_run(
+async def cancel_workflow_run(
     run_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
     user: User = Depends(require_permission("workflows:write")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return WorkflowService(db).cancel(tenant_id, user.id, run_id, dict(payload))
+    return await WorkflowService(db).cancel(tenant_id, user.id, run_id, dict(payload))
 
 
 @router.post("/workflow-runs/{run_id}/replay")
@@ -186,7 +187,7 @@ def approve_workflow(
     approval_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
-    user: User = Depends(require_permission("workflows:write")),
+    user: User = Depends(require_permission("workflows:approve")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     return WorkflowService(db).decide_approval(tenant_id, user.id, approval_id, True, dict(payload))
@@ -197,7 +198,7 @@ def reject_workflow(
     approval_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
-    user: User = Depends(require_permission("workflows:write")),
+    user: User = Depends(require_permission("workflows:approve")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     return WorkflowService(db).decide_approval(tenant_id, user.id, approval_id, False, dict(payload))
@@ -205,9 +206,12 @@ def reject_workflow(
 
 @router.websocket("/ws/workflow-runs/{run_id}")
 async def workflow_ws(websocket: WebSocket, run_id: str) -> None:
-    await websocket_manager.connect(run_id, websocket)
+    channel = await authorize_run_socket(websocket, "workflow_runs", run_id, "workflows:read")
+    if channel is None:
+        return
+    await websocket_manager.connect(channel, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        websocket_manager.disconnect(run_id, websocket)
+        websocket_manager.disconnect(channel, websocket)

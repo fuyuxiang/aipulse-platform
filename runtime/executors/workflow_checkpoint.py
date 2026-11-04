@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +31,7 @@ class Checkpoint:
             "workflow_run_id": self.workflow_run_id,
             "created_at": self.created_at,
             "completed_nodes": self.completed_nodes,
+            "results": self.completed_nodes,
             "context": self.context,
             "compensation_stack": self.compensation_stack,
             "pending_node_id": self.pending_node_id,
@@ -43,7 +44,7 @@ class Checkpoint:
             id=data.get("id", ""),
             workflow_run_id=data.get("workflow_run_id", ""),
             created_at=data.get("created_at", 0.0),
-            completed_nodes=data.get("completed_nodes", {}),
+            completed_nodes=data.get("results", data.get("completed_nodes", {})),
             context=data.get("context", {}),
             compensation_stack=data.get("compensation_stack", []),
             pending_node_id=data.get("pending_node_id", ""),
@@ -59,16 +60,22 @@ class CheckpointStore:
         self._base.mkdir(parents=True, exist_ok=True)
 
     def _run_dir(self, run_id: str) -> Path:
-        d = self._base / run_id
+        d = (self._base / run_id).resolve()
+        if not d.is_relative_to(self._base.resolve()):
+            raise ValueError("invalid run id")
         d.mkdir(parents=True, exist_ok=True)
         return d
 
     async def save(self, checkpoint: Checkpoint) -> str:
         path = self._run_dir(checkpoint.workflow_run_id) / f"{checkpoint.id}.json"
-        path.write_text(json.dumps(checkpoint.to_dict(), ensure_ascii=False, default=str), encoding="utf-8")
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(checkpoint.to_dict(), ensure_ascii=False, default=str), encoding="utf-8")
+        temporary.replace(path)
         return checkpoint.id
 
     async def load(self, run_id: str, checkpoint_id: str) -> Checkpoint | None:
+        if not checkpoint_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in checkpoint_id):
+            raise ValueError("invalid checkpoint id")
         path = self._run_dir(run_id) / f"{checkpoint_id}.json"
         if not path.exists():
             return None
@@ -92,6 +99,8 @@ class CheckpointStore:
         return results
 
     async def delete(self, run_id: str, checkpoint_id: str) -> bool:
+        if not checkpoint_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in checkpoint_id):
+            raise ValueError("invalid checkpoint id")
         path = self._run_dir(run_id) / f"{checkpoint_id}.json"
         if path.exists():
             path.unlink()
