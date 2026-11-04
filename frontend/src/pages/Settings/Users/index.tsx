@@ -1,90 +1,67 @@
-import { Card, Input, Space, Table, Tag, Typography, Button, Drawer, Form, Select, Switch, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
+import { useAccess } from "../../../access/context";
+import { checkedFetch } from '../../../services/http';
+import { Button, Card, Drawer, Form, Input, message, Select, Space, Table, Tag, Typography } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { api } from '../../../services/http';
+import { api, getToken } from '../../../services/http';
 import type { ResourceRecord } from '../../../models/types';
 
-interface UserRow extends ResourceRecord {
-  config?: { email?: string; phone?: string; role?: string; org_id?: string };
-}
+interface UserRow { id: string; username: string; display_name: string; email: string; is_active: boolean }
 
 export function UsersPage(): JSX.Element {
+  const { can } = useAccess();
   const [rows, setRows] = useState<UserRow[]>([]);
-  const [total, setTotal] = useState(0);
+  const [roles, setRoles] = useState<ResourceRecord[]>([]);
   const [open, setOpen] = useState(false);
-  const [form] = Form.useForm();
+  const [editing, setEditing] = useState<UserRow | null>(null);
   const [keyword, setKeyword] = useState('');
-
-  const load = async (page = 1): Promise<void> => {
+  const [saving, setSaving] = useState(false);
+  const [form] = Form.useForm();
+  const load = async (): Promise<void> => {
     try {
-      const res = await api.list<UserRow>('/users', page, 50);
-      const list = keyword ? res.items.filter((r) => `${r.name}${r.code}${r.config?.email}`.includes(keyword)) : res.items;
-      setRows(list);
-      setTotal(res.total);
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : '加载失败');
-    }
+      const users = await api.list<UserRow>('/users', 1, 200);
+      setRows(users.items);
+      setRoles((await api.list('/roles', 1, 200)).items);
+    } catch (e) { message.error(e instanceof Error ? e.message : '加载失败'); }
   };
-
   useEffect(() => { void load(); }, []);
-
+  const edit = async (user: UserRow): Promise<void> => {
+    try {
+      const result = await api.get<{ role_ids: string[] }>(`/users/${user.id}/roles`);
+      setEditing(user); form.setFieldsValue({ role_ids: result.role_ids }); setOpen(true);
+    } catch (e) { message.error(e instanceof Error ? e.message : '加载角色失败'); }
+  };
   const submit = async (): Promise<void> => {
     try {
-      const v = await form.validateFields();
-      await api.create('/users', { name: v.name, code: v.code, description: v.description || '', enabled: v.enabled !== false,
-        config: { email: v.email, phone: v.phone, role: v.role, org_id: v.org_id } });
-      setOpen(false); form.resetFields();
-      await load(); message.success('已创建用户');
+      const values = await form.validateFields(); setSaving(true);
+      let user = editing;
+      if (!user) user = await api.post<UserRow>('/users', { username: values.username, password: values.password, display_name: values.display_name || '', email: values.email || '' });
+      // Keep the created user in the drawer if assigning roles fails, so retry never creates a duplicate.
+      setEditing(user);
+      const response = await checkedFetch(`/api/v1/users/${user.id}/roles`, { method: 'PUT', headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(values.role_ids || []) });
+      if (!response.ok) throw new Error(await response.text());
+      setOpen(false); setEditing(null); form.resetFields(); await load(); message.success('用户与角色已保存');
     } catch (e) {
-      if ((e as { errorFields?: unknown }).errorFields) return;
-      message.error(e instanceof Error ? e.message : '保存失败');
-    }
+      if (!(e as { errorFields?: unknown }).errorFields) message.error(e instanceof Error ? e.message : '保存失败');
+    } finally { setSaving(false); }
   };
-
-  const columns: ColumnsType<UserRow> = [
-    { title: '用户', dataIndex: 'name', render: (v, r) => <Space><UserOutlined /><strong>{v}</strong><Tag>{r.code}</Tag></Space> },
-    { title: '邮箱', render: (_, r) => r.config?.email || '-' },
-    { title: '角色', render: (_, r) => <Tag color="processing">{r.config?.role || '-'}</Tag> },
-    { title: '组织', render: (_, r) => r.config?.org_id || '-' },
-    { title: '状态', dataIndex: 'enabled', width: 100, render: (v) => <Tag color={v ? 'success' : 'default'}>{v ? '启用' : '停用'}</Tag> },
-    { title: '更新时间', dataIndex: 'updated_at', width: 190 },
-  ];
-
-  return (
-    <div className="enterprise-page">
-      <section className="resource-hero">
-        <div>
-          <Space wrap><Tag color="processing">身份与访问</Tag><Tag>设置</Tag></Space>
-          <Typography.Title level={1}>用户</Typography.Title>
-          <Typography.Paragraph>管理租户内的用户、角色绑定和组织归属。</Typography.Paragraph>
-        </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建用户</Button>
-        </Space>
-      </section>
-
-      <Card bordered={false} className="enterprise-card">
-        <Space style={{ marginBottom: 12 }}>
-          <Input.Search placeholder="搜索用户名 / 邮箱" value={keyword} onChange={(e) => setKeyword(e.target.value)} onSearch={() => void load()} style={{ width: 320 }} />
-          <Typography.Text type="secondary">共 {total} 个用户</Typography.Text>
-        </Space>
-        <Table<UserRow> rowKey="id" dataSource={rows} columns={columns} pagination={{ pageSize: 20, total, onChange: (p) => void load(p) }} />
-      </Card>
-
-      <Drawer open={open} onClose={() => setOpen(false)} width={480} title="新建用户" extra={<Button type="primary" onClick={() => void submit()}>保存</Button>}>
-        <Form form={form} layout="vertical" initialValues={{ enabled: true }}>
-          <Form.Item name="name" label="用户名" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="code" label="登录账号" rules={[{ required: true }]}><Input placeholder="login id" /></Form.Item>
-          <Form.Item name="email" label="邮箱"><Input type="email" /></Form.Item>
-          <Form.Item name="phone" label="手机"><Input /></Form.Item>
-          <Form.Item name="role" label="角色"><Select options={[{ value: 'admin', label: '管理员' }, { value: 'developer', label: '开发者' }, { value: 'operator', label: '运维' }, { value: 'viewer', label: '只读' }]} /></Form.Item>
-          <Form.Item name="org_id" label="组织"><Input placeholder="组织编码" /></Form.Item>
-          <Form.Item name="description" label="备注"><Input.TextArea rows={2} /></Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>
-        </Form>
-      </Drawer>
-    </div>
-  );
+  return <div className="enterprise-page">
+    <section className="resource-hero"><div><Typography.Title level={1}>用户</Typography.Title><Typography.Paragraph>创建登录账号，分配或撤销实际生效的租户角色。</Typography.Paragraph></div>
+      <Button type="primary" disabled={!can("users:write")} onClick={() => { setEditing(null); form.resetFields(); setOpen(true); }}>新建用户</Button></section>
+    <Card><Input.Search placeholder="搜索用户名 / 邮箱" value={keyword} onChange={e => setKeyword(e.target.value)} />
+      <Table<UserRow> rowKey="id" dataSource={rows.filter(r => `${r.username} ${r.display_name} ${r.email}`.includes(keyword))} columns={[
+        { title: '登录账号', dataIndex: 'username' }, { title: '显示名称', dataIndex: 'display_name' }, { title: '邮箱', dataIndex: 'email' },
+        { title: '状态', render: (_, r) => <Tag>{r.is_active ? '启用' : '停用'}</Tag> },
+        { title: '操作', render: (_, r) => <Button onClick={() => void edit(r)}>分配角色</Button> }
+      ]} />
+    </Card>
+    <Drawer open={open} onClose={() => setOpen(false)} width={480} title={editing ? `分配角色：${editing.username}` : '新建用户'} extra={<Button type="primary" disabled={!can("users:write")} loading={saving} onClick={() => void submit()}>保存</Button>}>
+      <Form form={form} layout="vertical">
+        {!editing && <><Form.Item name="username" label="登录账号" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="password" label="初始密码" rules={[{ required: true }, { min: 8 }]}><Input.Password autoComplete="new-password" /></Form.Item>
+          <Form.Item name="display_name" label="显示名称"><Input /></Form.Item><Form.Item name="email" label="邮箱"><Input type="email" /></Form.Item></>}
+        <Form.Item name="role_ids" label="角色"><Select mode="multiple" showSearch optionFilterProp="label" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item>
+        <Space><Typography.Text type="secondary">移除全部角色后，该用户的受保护接口访问权限将立即失效。</Typography.Text></Space>
+      </Form>
+    </Drawer>
+  </div>;
 }

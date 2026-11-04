@@ -1,3 +1,4 @@
+import { useAccess } from "../../../access/context";
 import { Card, Input, Space, Table, Tag, Typography, Button, Drawer, Form, Switch, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, ApartmentOutlined } from '@ant-design/icons';
@@ -6,6 +7,7 @@ import { api } from '../../../services/http';
 import type { ResourceRecord } from '../../../models/types';
 
 export function OrganizationsPage(): JSX.Element {
+  const { can } = useAccess();
   const [rows, setRows] = useState<ResourceRecord[]>([]);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
@@ -46,7 +48,7 @@ export function OrganizationsPage(): JSX.Element {
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建组织</Button>
+          <Button type="primary" disabled={!can("orgs:write")} icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建组织</Button>
         </Space>
       </section>
 
@@ -54,7 +56,7 @@ export function OrganizationsPage(): JSX.Element {
         <Table<ResourceRecord> rowKey="id" dataSource={rows} columns={columns} pagination={{ pageSize: 20 }} />
       </Card>
 
-      <Drawer open={open} onClose={() => setOpen(false)} width={460} title="新建组织" extra={<Button type="primary" onClick={() => void submit()}>保存</Button>}>
+      <Drawer open={open} onClose={() => setOpen(false)} width={460} title="新建组织" extra={<Button type="primary" disabled={!can("orgs:write")} onClick={() => void submit()}>保存</Button>}>
         <Form form={form} layout="vertical" initialValues={{ enabled: true }}>
           <Form.Item name="name" label="组织名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="编码" rules={[{ required: true }]}><Input placeholder="org_xxx" /></Form.Item>

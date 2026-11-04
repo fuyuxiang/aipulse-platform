@@ -1,9 +1,12 @@
+import { useAccess } from "../../../access/context";
+import { checkedFetch } from '../../../services/http';
 import { Button, Card, Col, Drawer, Form, Input, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useEffect, useState } from 'react';
 import { getToken } from '../../../services/http';
 
 export function PromptStudioPage(): JSX.Element {
+  const { can } = useAccess();
   const [templates, setTemplates] = useState<any[]>([]);
   const [abTests, setAbTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +31,7 @@ export function PromptStudioPage(): JSX.Element {
       ]);
       if (tRes.ok) setTemplates((await tRes.json()).items || []);
       if (aRes.ok) setAbTests((await aRes.json()).items || []);
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
     setLoading(false);
   };
 
@@ -37,7 +40,7 @@ export function PromptStudioPage(): JSX.Element {
   const createTemplate = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      await fetch('/api/v1/prompt-templates', {
+      await checkedFetch('/api/v1/prompt-templates', {
         method: 'POST', headers,
         body: JSON.stringify({ name: values.name, content: values.content, category: values.category, description: values.description }),
       });
@@ -52,7 +55,7 @@ export function PromptStudioPage(): JSX.Element {
     try {
       const body: any = { raw_prompt: playgroundPrompt, variables: playgroundVars };
       if (selectedTemplate) body.template_id = selectedTemplate.id;
-      const res = await fetch('/api/v1/prompt-playground/run', { method: 'POST', headers, body: JSON.stringify(body) });
+      const res = await checkedFetch('/api/v1/prompt-playground/run', { method: 'POST', headers, body: JSON.stringify(body) });
       if (res.ok) setPlaygroundResult(await res.json());
     } catch { message.error('执行失败'); }
   };
@@ -60,7 +63,7 @@ export function PromptStudioPage(): JSX.Element {
   const createAbTest = async (): Promise<void> => {
     try {
       const values = await abForm.validateFields();
-      const res = await fetch('/api/v1/prompt-ab-tests', {
+      const res = await checkedFetch('/api/v1/prompt-ab-tests', {
         method: 'POST', headers,
         body: JSON.stringify({
           name: values.name,
@@ -71,7 +74,7 @@ export function PromptStudioPage(): JSX.Element {
       });
       if (res.ok) {
         const test = await res.json();
-        await fetch(`/api/v1/prompt-ab-tests/${test.id}/run`, { method: 'POST', headers });
+        await checkedFetch(`/api/v1/prompt-ab-tests/${test.id}/run`, { method: 'POST', headers });
         message.success('A/B 测试已创建并执行');
         setAbDrawerOpen(false);
         abForm.resetFields();
@@ -112,7 +115,7 @@ export function PromptStudioPage(): JSX.Element {
           children: (
             <>
               <div className="mb-4 flex justify-between">
-                <Button type="primary" onClick={() => setDrawerOpen(true)}>创建模板</Button>
+                <Button type="primary" disabled={!can("agents:write")} onClick={() => setDrawerOpen(true)}>创建模板</Button>
                 <Button onClick={() => { setSelectedTemplate(null); setPlaygroundPrompt(''); setPlaygroundOpen(true); }}>Playground</Button>
               </div>
               <Table rowKey="id" columns={templateColumns} dataSource={templates} loading={loading} pagination={{ pageSize: 20 }} />
@@ -123,14 +126,14 @@ export function PromptStudioPage(): JSX.Element {
           key: 'ab', label: 'A/B 测试',
           children: (
             <>
-              <div className="mb-4"><Button type="primary" onClick={() => setAbDrawerOpen(true)}>创建 A/B 测试</Button></div>
+              <div className="mb-4"><Button type="primary" disabled={!can("evaluation:write")} onClick={() => setAbDrawerOpen(true)}>创建 A/B 测试</Button></div>
               <Table rowKey="id" columns={abColumns} dataSource={abTests} loading={loading} pagination={{ pageSize: 20 }} />
             </>
           ),
         },
       ]} />
 
-      <Drawer open={drawerOpen} title="创建 Prompt 模板" width={600} onClose={() => setDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createTemplate()}>创建</Button>}>
+      <Drawer open={drawerOpen} title="创建 Prompt 模板" width={600} onClose={() => setDrawerOpen(false)} extra={<Button type="primary" disabled={!can("agents:write")} onClick={() => void createTemplate()}>创建</Button>}>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="模板名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="category" label="分类" initialValue="general">
@@ -154,7 +157,7 @@ export function PromptStudioPage(): JSX.Element {
           {selectedTemplate?.spec?.variables?.map((v: any) => (
             <Input key={v.name} addonBefore={v.name} value={playgroundVars[v.name] || ''} onChange={(e) => setPlaygroundVars({ ...playgroundVars, [v.name]: e.target.value })} />
           ))}
-          <Button type="primary" onClick={() => void runPlayground()}>执行</Button>
+          <Button type="primary" disabled={!can("agents:write")} onClick={() => void runPlayground()}>执行</Button>
           {playgroundResult && (
             <Card size="small" title="结果">
               <p className="whitespace-pre-wrap text-sm">{playgroundResult.response}</p>
@@ -166,7 +169,7 @@ export function PromptStudioPage(): JSX.Element {
         </Space>
       </Drawer>
 
-      <Drawer open={abDrawerOpen} title="创建 A/B 测试" width={600} onClose={() => setAbDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createAbTest()}>创建并执行</Button>}>
+      <Drawer open={abDrawerOpen} title="创建 A/B 测试" width={600} onClose={() => setAbDrawerOpen(false)} extra={<Button type="primary" disabled={!can("evaluation:write")} onClick={() => void createAbTest()}>创建并执行</Button>}>
         <Form form={abForm} layout="vertical">
           <Form.Item name="name" label="测试名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="variant_a" label="Variant A (Prompt)" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item>

@@ -1,9 +1,12 @@
+import { useAccess } from "../../../access/context";
+import { checkedFetch } from '../../../services/http';
 import { Button, Card, Drawer, Form, Input, Select, Space, Switch, Table, Tag, Tabs, message, Statistic, Row, Col } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useEffect, useState } from 'react';
 import { api, getToken } from '../../../services/http';
 
 export function GuardrailsPage(): JSX.Element {
+  const { can } = useAccess();
   const [policies, setPolicies] = useState<any[]>([]);
   const [violations, setViolations] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
@@ -26,7 +29,7 @@ export function GuardrailsPage(): JSX.Element {
       if (pRes.ok) setPolicies((await pRes.json()).items || []);
       if (vRes.ok) setViolations((await vRes.json()).items || []);
       if (sRes.ok) setStats(await sRes.json());
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
     setLoading(false);
   };
 
@@ -35,7 +38,7 @@ export function GuardrailsPage(): JSX.Element {
   const createPolicy = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      await fetch('/api/v1/guardrails/policies', {
+      await checkedFetch('/api/v1/guardrails/policies', {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -56,7 +59,7 @@ export function GuardrailsPage(): JSX.Element {
   const runTest = async (): Promise<void> => {
     try {
       const endpoint = testScope === 'input' ? '/api/v1/guardrails/check-input' : '/api/v1/guardrails/check-output';
-      const res = await fetch(endpoint, {
+      const res = await checkedFetch(endpoint, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: testContent }),
@@ -91,7 +94,7 @@ export function GuardrailsPage(): JSX.Element {
 
       <div className="mb-4 flex justify-between">
         <Space>
-          <Button type="primary" onClick={() => setDrawerOpen(true)}>创建策略</Button>
+          <Button type="primary" disabled={!can("security:write")} onClick={() => setDrawerOpen(true)}>创建策略</Button>
           <Button onClick={() => setTestDrawerOpen(true)}>护栏验证</Button>
         </Space>
       </div>
@@ -101,7 +104,7 @@ export function GuardrailsPage(): JSX.Element {
         { key: 'violations', label: '违规记录', children: <Table rowKey="id" columns={violationColumns} dataSource={violations} loading={loading} pagination={{ pageSize: 20 }} /> },
       ]} />
 
-      <Drawer open={drawerOpen} title="创建护栏策略" width={520} onClose={() => setDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createPolicy()}>创建</Button>}>
+      <Drawer open={drawerOpen} title="创建护栏策略" width={520} onClose={() => setDrawerOpen(false)} extra={<Button type="primary" disabled={!can("security:write")} onClick={() => void createPolicy()}>创建</Button>}>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="策略名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="description" label="描述"><Input.TextArea rows={2} /></Form.Item>
@@ -128,7 +131,7 @@ export function GuardrailsPage(): JSX.Element {
         <Space direction="vertical" className="w-full" size="middle">
           <Select value={testScope} onChange={setTestScope} className="w-full" options={[{ value: 'input', label: '输入检测' }, { value: 'output', label: '输出检测' }]} />
           <Input.TextArea rows={5} value={testContent} onChange={(e) => setTestContent(e.target.value)} placeholder="输入待检测的内容" />
-          <Button type="primary" onClick={() => void runTest()}>开始检测</Button>
+          <Button type="primary" disabled={!can("security:write")} onClick={() => void runTest()}>开始检测</Button>
           {testResult && (
             <Card size="small" title={testResult.passed ? '通过' : '未通过'}>
               <p>动作: <Tag color={testResult.action === 'block' ? 'red' : 'orange'}>{testResult.action}</Tag></p>

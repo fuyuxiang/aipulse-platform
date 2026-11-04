@@ -1,3 +1,4 @@
+import { useAccess } from "../../../access/context";
 import { Card, Input, Space, Table, Tag, Typography, Button, Drawer, Form, Select, Switch, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
@@ -9,19 +10,13 @@ interface RoleRow extends ResourceRecord {
   config?: { permissions?: string[]; scope?: string };
 }
 
-const PERMISSIONS = [
-  { value: 'agent:read', label: '智能体只读' },
-  { value: 'agent:write', label: '智能体编辑' },
-  { value: 'workflow:write', label: '工作流编辑' },
-  { value: 'tool:write', label: '工具编辑' },
-  { value: 'knowledge:write', label: '知识库编辑' },
-  { value: 'audit:read', label: '审计查看' },
-  { value: 'cost:read', label: '成本查看' },
-  { value: 'settings:write', label: '设置编辑' },
-];
+
 
 export function RolesPage(): JSX.Element {
+  const { can } = useAccess();
   const [rows, setRows] = useState<RoleRow[]>([]);
+  const [permissions, setPermissions] = useState<Array<{ value: string; label: string }>>([]);
+  const [editing, setEditing] = useState<RoleRow | null>(null);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
 
@@ -29,6 +24,8 @@ export function RolesPage(): JSX.Element {
     try {
       const res = await api.list<RoleRow>('/roles', 1, 50);
       setRows(res.items);
+      const available = await api.list('/permissions', 1, 200);
+      setPermissions(available.items.map(p => ({ value: p.code || '', label: p.name })));
     } catch (e) { message.error(e instanceof Error ? e.message : '加载失败'); }
   };
 
@@ -37,9 +34,11 @@ export function RolesPage(): JSX.Element {
   const submit = async (): Promise<void> => {
     try {
       const v = await form.validateFields();
-      await api.create('/roles', { name: v.name, code: v.code, description: v.description || '', enabled: v.enabled !== false,
-        config: { permissions: v.permissions || [], scope: v.scope || 'tenant' } });
-      setOpen(false); form.resetFields(); await load(); message.success('已创建角色');
+      const payload = { name: v.name, code: v.code, description: v.description || '', enabled: v.enabled !== false,
+        config: { permissions: v.permissions || [], scope: 'tenant' } };
+      if (editing) await api.update('/roles', editing.id, payload);
+      else await api.create('/roles', payload);
+      setOpen(false); form.resetFields(); await load(); message.success('角色权限已保存');
     } catch (e) {
       if ((e as { errorFields?: unknown }).errorFields) return;
       message.error(e instanceof Error ? e.message : '保存失败');
@@ -51,7 +50,7 @@ export function RolesPage(): JSX.Element {
     { title: '作用域', render: (_, r) => <Tag color="blue">{r.config?.scope || 'tenant'}</Tag> },
     { title: '权限', render: (_, r) => (r.config?.permissions || []).map((p) => <Tag key={p}>{p}</Tag>) },
     { title: '描述', dataIndex: 'description', ellipsis: true },
-    { title: '状态', dataIndex: 'enabled', width: 100, render: (v) => <Tag color={v ? 'success' : 'default'}>{v ? '启用' : '停用'}</Tag> },
+    { title: '操作', render: (_, r) => <Button onClick={() => { setEditing(r); form.setFieldsValue({ ...r, permissions: r.config?.permissions || [] }); setOpen(true); }}>编辑权限</Button> },
   ];
 
   return (
@@ -64,7 +63,7 @@ export function RolesPage(): JSX.Element {
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建角色</Button>
+          <Button type="primary" disabled={!can("roles:write")} icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setOpen(true); }}>新建角色</Button>
         </Space>
       </section>
 
@@ -72,14 +71,13 @@ export function RolesPage(): JSX.Element {
         <Table<RoleRow> rowKey="id" dataSource={rows} columns={columns} pagination={{ pageSize: 20 }} />
       </Card>
 
-      <Drawer open={open} onClose={() => setOpen(false)} width={480} title="新建角色" extra={<Button type="primary" icon={<SafetyCertificateOutlined />} onClick={() => void submit()}>保存</Button>}>
+      <Drawer open={open} onClose={() => setOpen(false)} width={480} title={editing ? '编辑角色' : '新建角色'} extra={<Button type="primary" disabled={!can("roles:write")} icon={<SafetyCertificateOutlined />} onClick={() => void submit()}>保存</Button>}>
         <Form form={form} layout="vertical" initialValues={{ enabled: true, scope: 'tenant' }}>
           <Form.Item name="name" label="角色名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="编码" rules={[{ required: true }]}><Input placeholder="role_xxx" /></Form.Item>
           <Form.Item name="description" label="描述"><Input.TextArea rows={2} /></Form.Item>
-          <Form.Item name="scope" label="作用域"><Select options={[{ value: 'tenant', label: '租户级' }, { value: 'org', label: '组织级' }, { value: 'project', label: '项目级' }]} /></Form.Item>
-          <Form.Item name="permissions" label="权限"><Select mode="multiple" options={PERMISSIONS} /></Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>
+          <Form.Item name="scope" label="作用域"><Select options={[{ value: 'tenant', label: '租户级' }]} /></Form.Item>
+          <Form.Item name="permissions" label="权限"><Select mode="multiple" showSearch optionFilterProp="label" options={permissions} /></Form.Item>
         </Form>
       </Drawer>
     </div>

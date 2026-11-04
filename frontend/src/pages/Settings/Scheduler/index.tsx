@@ -1,9 +1,12 @@
+import { useAccess } from "../../../access/context";
+import { checkedFetch } from '../../../services/http';
 import { Button, Card, Col, Drawer, Form, Input, Row, Select, Space, Statistic, Switch, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useEffect, useState } from 'react';
 import { getToken } from '../../../services/http';
 
 export function SchedulerPage(): JSX.Element {
+  const { can } = useAccess();
   const [jobs, setJobs] = useState<any[]>([]);
   const [webhooks, setWebhooks] = useState<any[]>([]);
   const [triggers, setTriggers] = useState<any[]>([]);
@@ -31,7 +34,7 @@ export function SchedulerPage(): JSX.Element {
       if (wRes.ok) setWebhooks((await wRes.json()).items || []);
       if (tRes.ok) setTriggers((await tRes.json()).items || []);
       if (sRes.ok) setStats(await sRes.json());
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
     setLoading(false);
   };
 
@@ -40,7 +43,7 @@ export function SchedulerPage(): JSX.Element {
   const createJob = async (): Promise<void> => {
     try {
       const values = await jobForm.validateFields();
-      await fetch('/api/v1/scheduler/jobs', {
+      await checkedFetch('/api/v1/scheduler/jobs', {
         method: 'POST', headers,
         body: JSON.stringify({
           name: values.name,
@@ -61,7 +64,7 @@ export function SchedulerPage(): JSX.Element {
 
   const triggerJob = async (jobId: string): Promise<void> => {
     try {
-      await fetch(`/api/v1/scheduler/jobs/${jobId}/trigger`, { method: 'POST', headers, body: '{}' });
+      await checkedFetch(`/api/v1/scheduler/jobs/${jobId}/trigger`, { method: 'POST', headers, body: '{}' });
       message.success('已触发执行');
       await load();
     } catch { message.error('触发失败'); }
@@ -69,14 +72,14 @@ export function SchedulerPage(): JSX.Element {
 
   const toggleJob = async (jobId: string, enabled: boolean): Promise<void> => {
     const endpoint = enabled ? 'enable' : 'disable';
-    await fetch(`/api/v1/scheduler/jobs/${jobId}/${endpoint}`, { method: 'POST', headers });
+    await checkedFetch(`/api/v1/scheduler/jobs/${jobId}/${endpoint}`, { method: 'POST', headers });
     await load();
   };
 
   const createWebhook = async (): Promise<void> => {
     try {
       const values = await webhookForm.validateFields();
-      await fetch('/api/v1/scheduler/webhooks', {
+      await checkedFetch('/api/v1/scheduler/webhooks', {
         method: 'POST', headers,
         body: JSON.stringify({ name: values.name, target_type: values.target_type, target_id: values.target_id }),
       });
@@ -90,7 +93,7 @@ export function SchedulerPage(): JSX.Element {
   const createTrigger = async (): Promise<void> => {
     try {
       const values = await triggerForm.validateFields();
-      await fetch('/api/v1/scheduler/triggers', {
+      await checkedFetch('/api/v1/scheduler/triggers', {
         method: 'POST', headers,
         body: JSON.stringify({
           name: values.name,
@@ -118,7 +121,7 @@ export function SchedulerPage(): JSX.Element {
     { title: '启用', render: (_, r) => <Switch size="small" checked={r.status === 'active'} onChange={(v) => void toggleJob(r.id, v)} /> },
     {
       title: '操作', render: (_, r) => (
-        <Button size="small" type="primary" onClick={() => void triggerJob(r.id)}>手动触发</Button>
+        <Button size="small" type="primary" disabled={!can("runtime:write")} onClick={() => void triggerJob(r.id)}>手动触发</Button>
       ),
     },
   ];
@@ -153,7 +156,7 @@ export function SchedulerPage(): JSX.Element {
           key: 'jobs', label: '定时任务',
           children: (
             <>
-              <div className="mb-3"><Button type="primary" onClick={() => setJobDrawerOpen(true)}>创建任务</Button></div>
+              <div className="mb-3"><Button type="primary" disabled={!can("runtime:write")} onClick={() => setJobDrawerOpen(true)}>创建任务</Button></div>
               <Table rowKey="id" columns={jobColumns} dataSource={jobs} loading={loading} pagination={{ pageSize: 20 }} />
             </>
           ),
@@ -162,7 +165,7 @@ export function SchedulerPage(): JSX.Element {
           key: 'webhooks', label: 'Webhooks',
           children: (
             <>
-              <div className="mb-3"><Button type="primary" onClick={() => setWebhookDrawerOpen(true)}>创建 Webhook</Button></div>
+              <div className="mb-3"><Button type="primary" disabled={!can("runtime:write")} onClick={() => setWebhookDrawerOpen(true)}>创建 Webhook</Button></div>
               <Table rowKey="id" columns={webhookColumns} dataSource={webhooks} loading={loading} pagination={{ pageSize: 20 }} />
             </>
           ),
@@ -171,14 +174,14 @@ export function SchedulerPage(): JSX.Element {
           key: 'triggers', label: '事件触发器',
           children: (
             <>
-              <div className="mb-3"><Button type="primary" onClick={() => setTriggerDrawerOpen(true)}>创建触发器</Button></div>
+              <div className="mb-3"><Button type="primary" disabled={!can("runtime:write")} onClick={() => setTriggerDrawerOpen(true)}>创建触发器</Button></div>
               <Table rowKey="id" columns={triggerColumns} dataSource={triggers} loading={loading} pagination={{ pageSize: 20 }} />
             </>
           ),
         },
       ]} />
 
-      <Drawer open={jobDrawerOpen} title="创建定时任务" width={480} onClose={() => setJobDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createJob()}>创建</Button>}>
+      <Drawer open={jobDrawerOpen} title="创建定时任务" width={480} onClose={() => setJobDrawerOpen(false)} extra={<Button type="primary" disabled={!can("runtime:write")} onClick={() => void createJob()}>创建</Button>}>
         <Form form={jobForm} layout="vertical">
           <Form.Item name="name" label="任务名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="job_type" label="类型" initialValue="cron">
@@ -194,7 +197,7 @@ export function SchedulerPage(): JSX.Element {
         </Form>
       </Drawer>
 
-      <Drawer open={webhookDrawerOpen} title="创建 Webhook" width={480} onClose={() => setWebhookDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createWebhook()}>创建</Button>}>
+      <Drawer open={webhookDrawerOpen} title="创建 Webhook" width={480} onClose={() => setWebhookDrawerOpen(false)} extra={<Button type="primary" disabled={!can("runtime:write")} onClick={() => void createWebhook()}>创建</Button>}>
         <Form form={webhookForm} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="target_type" label="目标类型" initialValue="agent">
@@ -204,7 +207,7 @@ export function SchedulerPage(): JSX.Element {
         </Form>
       </Drawer>
 
-      <Drawer open={triggerDrawerOpen} title="创建事件触发器" width={480} onClose={() => setTriggerDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createTrigger()}>创建</Button>}>
+      <Drawer open={triggerDrawerOpen} title="创建事件触发器" width={480} onClose={() => setTriggerDrawerOpen(false)} extra={<Button type="primary" disabled={!can("runtime:write")} onClick={() => void createTrigger()}>创建</Button>}>
         <Form form={triggerForm} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="event_source" label="事件源" rules={[{ required: true }]}><Input placeholder="如: agent_run, workflow_complete" /></Form.Item>

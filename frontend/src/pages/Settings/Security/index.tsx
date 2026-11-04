@@ -1,3 +1,4 @@
+import { useAccess } from "../../../access/context";
 import { Card, Input, Space, Table, Tag, Tabs, Typography, Button, Drawer, Form, Switch, Select, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, LockOutlined, KeyOutlined, GlobalOutlined, SafetyOutlined } from '@ant-design/icons';
@@ -18,6 +19,7 @@ const TABS: Array<{ key: string; label: string; api: string; icon: React.ReactNo
 ];
 
 export function SecurityPage(): JSX.Element {
+  const { can } = useAccess();
   const [active, setActive] = useState(TABS[0].key);
   const [data, setData] = useState<Record<string, SecurityResource[]>>({});
   const [open, setOpen] = useState(false);
@@ -66,7 +68,7 @@ export function SecurityPage(): JSX.Element {
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>{tab.new}</Button>
+          <Button type="primary" disabled={!can("security:write")} icon={<PlusOutlined />} onClick={() => setOpen(true)}>{tab.new}</Button>
         </Space>
       </section>
 
@@ -85,7 +87,7 @@ export function SecurityPage(): JSX.Element {
         />
       </Card>
 
-      <Drawer open={open} onClose={() => setOpen(false)} width={520} title={tab.new} extra={<Button type="primary" onClick={() => void submit()}>保存</Button>}>
+      <Drawer open={open} onClose={() => setOpen(false)} width={520} title={tab.new} extra={<Button type="primary" disabled={!can("security:write")} onClick={() => void submit()}>保存</Button>}>
         <Form form={form} layout="vertical" initialValues={{ enabled: true }}>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="编码"><Input /></Form.Item>

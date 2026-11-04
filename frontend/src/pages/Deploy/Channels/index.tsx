@@ -1,3 +1,5 @@
+import { useAccess } from "../../../access/context";
+import { checkedFetch } from '../../../services/http';
 import { AppstoreOutlined, DownloadOutlined, StarOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Drawer, Form, Input, Rate, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -5,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { getToken } from '../../../services/http';
 
 export function MarketplacePage(): JSX.Element {
+  const { can } = useAccess();
   const [listings, setListings] = useState<any[]>([]);
   const [installs, setInstalls] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -31,7 +34,7 @@ export function MarketplacePage(): JSX.Element {
       if (iRes.ok) setInstalls((await iRes.json()).items || []);
       if (cRes.ok) setCategories((await cRes.json()).items || []);
       if (sRes.ok) setStats(await sRes.json());
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
     setLoading(false);
   };
 
@@ -39,15 +42,15 @@ export function MarketplacePage(): JSX.Element {
 
   const search = async (): Promise<void> => {
     try {
-      const res = await fetch(`/api/v1/marketplace/search?q=${encodeURIComponent(searchQuery)}&page=1&page_size=50`, { headers });
+      const res = await checkedFetch(`/api/v1/marketplace/search?q=${encodeURIComponent(searchQuery)}&page=1&page_size=50`, { headers });
       if (res.ok) setListings((await res.json()).items || []);
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
   };
 
   const publishListing = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      await fetch('/api/v1/marketplace/listings', {
+      const response = await checkedFetch('/api/v1/marketplace/listings', {
         method: 'POST', headers,
         body: JSON.stringify({
           name: values.name,
@@ -59,6 +62,7 @@ export function MarketplacePage(): JSX.Element {
           version: values.version || '1.0.0',
         }),
       });
+      if (!response.ok) throw new Error(await response.text());
       message.success('发布成功，等待审核');
       setPublishOpen(false);
       form.resetFields();
@@ -68,7 +72,8 @@ export function MarketplacePage(): JSX.Element {
 
   const installListing = async (listingId: string): Promise<void> => {
     try {
-      await fetch(`/api/v1/marketplace/listings/${listingId}/install`, { method: 'POST', headers });
+      const response = await checkedFetch(`/api/v1/marketplace/listings/${listingId}/install`, { method: 'POST', headers });
+      if (!response.ok) throw new Error(await response.text());
       message.success('安装成功');
       await load();
     } catch { message.error('安装失败'); }
@@ -76,12 +81,12 @@ export function MarketplacePage(): JSX.Element {
 
   const viewDetail = async (listing: any): Promise<void> => {
     try {
-      const res = await fetch(`/api/v1/marketplace/listings/${listing.id}`, { headers });
+      const res = await checkedFetch(`/api/v1/marketplace/listings/${listing.id}`, { headers });
       if (res.ok) {
         setSelectedListing(await res.json());
         setDetailOpen(true);
       }
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
   };
 
   const listingColumns: ColumnsType<any> = [
@@ -94,7 +99,7 @@ export function MarketplacePage(): JSX.Element {
     {
       title: '操作', render: (_, r) => (
         <Space>
-          <Button size="small" type="primary" onClick={() => void installListing(r.id)}>安装</Button>
+          <Button size="small" type="primary" disabled={!can("agents:write")} onClick={() => void installListing(r.id)}>安装</Button>
           <Button size="small" onClick={() => void viewDetail(r)}>详情</Button>
         </Space>
       ),
@@ -126,7 +131,7 @@ export function MarketplacePage(): JSX.Element {
                 <Space>
                   <Input.Search placeholder="搜索 Agent、工具、Workflow..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onSearch={() => void search()} style={{ width: 300 }} />
                 </Space>
-                <Button type="primary" onClick={() => setPublishOpen(true)}>发布到市场</Button>
+                <Button type="primary" disabled={!can("agents:write")} onClick={() => setPublishOpen(true)}>发布到市场</Button>
               </div>
               <Table rowKey="id" columns={listingColumns} dataSource={listings} loading={loading} pagination={{ pageSize: 20 }} />
             </>
@@ -138,7 +143,7 @@ export function MarketplacePage(): JSX.Element {
         },
       ]} />
 
-      <Drawer open={publishOpen} title="发布到市场" width={520} onClose={() => setPublishOpen(false)} extra={<Button type="primary" onClick={() => void publishListing()}>发布</Button>}>
+      <Drawer open={publishOpen} title="发布到市场" width={520} onClose={() => setPublishOpen(false)} extra={<Button type="primary" disabled={!can("agents:write")} onClick={() => void publishListing()}>发布</Button>}>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="type" label="类型" initialValue="agent">
@@ -175,7 +180,7 @@ export function MarketplacePage(): JSX.Element {
                 ))}
               </Card>
             )}
-            <Button type="primary" block onClick={() => void installListing(selectedListing.id)}>安装到我的空间</Button>
+            <Button type="primary" disabled={!can("agents:write")} block onClick={() => void installListing(selectedListing.id)}>安装到我的空间</Button>
           </Space>
         )}
       </Drawer>

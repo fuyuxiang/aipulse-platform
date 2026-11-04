@@ -1,3 +1,4 @@
+import { useAccess } from "../../../access/context";
 import { Card, Input, Space, Table, Tag, Tabs, Typography, Button, Drawer, Form, Select, Switch, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, AlertOutlined } from '@ant-design/icons';
@@ -27,6 +28,7 @@ interface AlertEvent {
 const SEVERITY_COLOR: Record<string, string> = { critical: 'error', high: 'volcano', medium: 'warning', low: 'default' };
 
 export function AlertsPage(): JSX.Element {
+  const { can } = useAccess();
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [open, setOpen] = useState(false);
@@ -97,7 +99,7 @@ export function AlertsPage(): JSX.Element {
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建规则</Button>
+          <Button type="primary" disabled={!can("alerts:write")} icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建规则</Button>
         </Space>
       </section>
 
@@ -112,7 +114,7 @@ export function AlertsPage(): JSX.Element {
         />
       </Card>
 
-      <Drawer open={open} onClose={() => setOpen(false)} width={520} title="新建告警规则" extra={<Button type="primary" onClick={() => void submit()}>保存</Button>}>
+      <Drawer open={open} onClose={() => setOpen(false)} width={520} title="新建告警规则" extra={<Button type="primary" disabled={!can("alerts:write")} onClick={() => void submit()}>保存</Button>}>
         <Form form={form} layout="vertical" initialValues={{ enabled: true, op: '>', channel: 'email' }}>
           <Form.Item name="name" label="规则名称" rules={[{ required: true }]}><Input placeholder="例：模型延迟告警" /></Form.Item>
           <Form.Item name="code" label="编码"><Input placeholder="alert_xxx" /></Form.Item>

@@ -1,4 +1,5 @@
-import { Button, Card, Input, Space, Table, Tag, Tooltip } from 'antd';
+import { checkedFetch } from '../../../services/http';
+import { Button, Card, message, Input, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useEffect, useState } from 'react';
 import { getToken } from '../../../services/http';
@@ -37,12 +38,12 @@ export function TraceVisualizationPage(): JSX.Element {
   const loadTraces = async (): Promise<void> => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/observability/traces?page=1&page_size=50', { headers });
+      const res = await checkedFetch('/api/v1/observability/traces?page=1&page_size=50', { headers });
       if (res.ok) {
         const data = await res.json();
         setTraces(data.items || []);
       }
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
     setLoading(false);
   };
 
@@ -50,13 +51,13 @@ export function TraceVisualizationPage(): JSX.Element {
 
   const loadTraceDetail = async (traceId: string): Promise<void> => {
     try {
-      const res = await fetch(`/api/v1/observability/traces/${traceId}`, { headers });
+      const res = await checkedFetch(`/api/v1/observability/traces/${traceId}`, { headers });
       if (res.ok) {
         const data = await res.json();
         setSelectedTrace(data.spans || []);
         setSelectedTraceId(traceId);
       }
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
   };
 
   const searchTrace = async (): Promise<void> => {

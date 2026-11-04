@@ -1,3 +1,4 @@
+import { useAccess } from "../../../access/context";
 import { Card, Input, Space, Table, Tag, Typography, Button, Drawer, Form, Switch, Select, message, Row, Col, Statistic } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, SettingOutlined, CloudServerOutlined, DatabaseOutlined } from '@ant-design/icons';
@@ -17,6 +18,7 @@ const CATEGORIES = [
 ];
 
 export function SystemPage(): JSX.Element {
+  const { can } = useAccess();
   const [rows, setRows] = useState<SystemConfig[]>([]);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
@@ -65,7 +67,7 @@ export function SystemPage(): JSX.Element {
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建配置</Button>
+          <Button type="primary" disabled={!can("system:write")} icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建配置</Button>
         </Space>
       </section>
 
@@ -86,7 +88,7 @@ export function SystemPage(): JSX.Element {
         <Table<SystemConfig> rowKey="id" dataSource={rows} columns={columns} pagination={{ pageSize: 20 }} />
       </Card>
 
-      <Drawer open={open} onClose={() => setOpen(false)} width={520} title="新建配置" extra={<Button type="primary" onClick={() => void submit()}>保存</Button>}>
+      <Drawer open={open} onClose={() => setOpen(false)} width={520} title="新建配置" extra={<Button type="primary" disabled={!can("system:write")} onClick={() => void submit()}>保存</Button>}>
         <Form form={form} layout="vertical" initialValues={{ enabled: true, category: 'platform' }}>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="Key" rules={[{ required: true }]}><Input placeholder="例：platform.maintenance_mode" /></Form.Item>

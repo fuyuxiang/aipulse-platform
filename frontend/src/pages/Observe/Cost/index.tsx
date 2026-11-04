@@ -1,3 +1,5 @@
+import { useAccess } from "../../../access/context";
+import { checkedFetch } from '../../../services/http';
 import { DollarOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Drawer, Form, Input, Progress, Row, Select, Space, Statistic, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -5,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { getToken } from '../../../services/http';
 
 export function CostAnalyticsPage(): JSX.Element {
+  const { can } = useAccess();
   const [summary, setSummary] = useState<any>({});
   const [budgets, setBudgets] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
@@ -25,7 +28,7 @@ export function CostAnalyticsPage(): JSX.Element {
       if (sRes.ok) setSummary(await sRes.json());
       if (bRes.ok) setBudgets((await bRes.json()).items || []);
       if (aRes.ok) setAlerts((await aRes.json()).items || []);
-    } catch { /* ignore */ }
+    } catch (reason) { message.error(reason instanceof Error ? reason.message : '数据加载失败，请重试'); }
     setLoading(false);
   };
 
@@ -34,7 +37,7 @@ export function CostAnalyticsPage(): JSX.Element {
   const createBudget = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      await fetch('/api/v1/cost/budgets', {
+      await checkedFetch('/api/v1/cost/budgets', {
         method: 'POST', headers,
         body: JSON.stringify({
           name: values.name,
@@ -135,7 +138,7 @@ export function CostAnalyticsPage(): JSX.Element {
           key: 'budgets', label: '预算管理',
           children: (
             <>
-              <div className="mb-3"><Button type="primary" onClick={() => setBudgetDrawerOpen(true)}>创建预算</Button></div>
+              <div className="mb-3"><Button type="primary" disabled={!can("observability:write")} onClick={() => setBudgetDrawerOpen(true)}>创建预算</Button></div>
               <Table rowKey="id" columns={budgetColumns} dataSource={budgets} loading={loading} pagination={{ pageSize: 20 }} />
             </>
           ),
@@ -146,7 +149,7 @@ export function CostAnalyticsPage(): JSX.Element {
         },
       ]} />
 
-      <Drawer open={budgetDrawerOpen} title="创建预算" width={480} onClose={() => setBudgetDrawerOpen(false)} extra={<Button type="primary" onClick={() => void createBudget()}>创建</Button>}>
+      <Drawer open={budgetDrawerOpen} title="创建预算" width={480} onClose={() => setBudgetDrawerOpen(false)} extra={<Button type="primary" disabled={!can("observability:write")} onClick={() => void createBudget()}>创建</Button>}>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="预算名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="scope" label="范围" initialValue="tenant">
