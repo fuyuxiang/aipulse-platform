@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
+from app.models.resources import RESOURCE_MODELS
+from app.core.constants import ErrorCode
+from app.core.errors import AppError
 
 from app.services._shared.resource_service import ResourceService
 
@@ -19,6 +23,8 @@ class ChatService:
 
     def create_session(self, tenant_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         agent_id = str(payload.get("agent_id", ""))
+        if agent_id:
+            self.resources.get("agents", tenant_id, agent_id)
         title = str(payload.get("title", "新对话"))
         session = self.resources.create("chat_sessions", tenant_id, user_id, {
             "name": title,
@@ -28,6 +34,7 @@ class ChatService:
             "user_id": user_id,
             "spec": {
                 "agent_id": agent_id,
+                "model_id": str(payload.get("model_id") or ""),
                 "title": title,
                 "message_count": 0,
                 "last_message_at": None,
@@ -47,21 +54,35 @@ class ChatService:
         rows, total = self.resources.list("chat_sessions", tenant_id, page, page_size, {"user_id": user_id, "status": "active"})
         return [ResourceService.to_dict(row) for row in rows], total
 
-    def get_session(self, tenant_id: str, session_id: str) -> dict[str, Any]:
-        return ResourceService.to_dict(self.resources.get("chat_sessions", tenant_id, session_id))
+    def require_session(self, tenant_id: str, user_id: str, session_id: str) -> Any:
+        session = self.resources.get("chat_sessions", tenant_id, session_id)
+        if session.user_id != user_id:
+            raise AppError(ErrorCode.NOT_FOUND, "chat session not found", 404)
+        return session
+
+    def get_session(self, tenant_id: str, session_id: str, user_id: str) -> dict[str, Any]:
+        return ResourceService.to_dict(self.require_session(tenant_id, user_id, session_id))
 
     def update_session(self, tenant_id: str, user_id: str, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        row = self.resources.update("chat_sessions", tenant_id, user_id, session_id, payload)
+        self.require_session(tenant_id, user_id, session_id)
+        session = self.require_session(tenant_id, user_id, session_id)
+        values = {k: v for k, v in payload.items() if k in {"name", "status"}}
+        if isinstance(payload.get("spec"), dict):
+            values["spec"] = {**session.spec, **{k: v for k, v in payload["spec"].items() if k in {"pinned", "title", "context_window", "temperature", "max_tokens"}}}
+        row = self.resources.update("chat_sessions", tenant_id, user_id, session_id, values)
         return ResourceService.to_dict(row)
 
     def delete_session(self, tenant_id: str, user_id: str, session_id: str) -> dict[str, str]:
+        self.require_session(tenant_id, user_id, session_id)
         return self.resources.delete("chat_sessions", tenant_id, user_id, session_id)
 
     def archive_session(self, tenant_id: str, user_id: str, session_id: str) -> dict[str, Any]:
+        self.require_session(tenant_id, user_id, session_id)
         row = self.resources.update("chat_sessions", tenant_id, user_id, session_id, {"status": "archived"})
         return ResourceService.to_dict(row)
 
     def pin_session(self, tenant_id: str, user_id: str, session_id: str, pinned: bool) -> dict[str, Any]:
+        self.require_session(tenant_id, user_id, session_id)
         session = self.resources.get("chat_sessions", tenant_id, session_id)
         spec = dict(session.spec or {})
         spec["pinned"] = pinned
@@ -69,6 +90,7 @@ class ChatService:
         return ResourceService.to_dict(row)
 
     def send_message(self, tenant_id: str, user_id: str, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.require_session(tenant_id, user_id, session_id)
         content = str(payload.get("content", ""))
         role = str(payload.get("role", "user"))
         attachments = payload.get("attachments", [])
@@ -99,15 +121,20 @@ class ChatService:
         self.resources.update("chat_sessions", tenant_id, user_id, session_id, {"spec": spec})
         return ResourceService.to_dict(msg)
 
-    def list_messages(self, tenant_id: str, session_id: str, page: int, page_size: int) -> tuple[list[dict[str, Any]], int]:
-        rows, total = self.resources.list("chat_messages", tenant_id, page, page_size, {"session_id": session_id})
-        return [ResourceService.to_dict(row) for row in rows], total
+    def list_messages(self, tenant_id: str, session_id: str, page: int, page_size: int, user_id: str) -> tuple[list[dict[str, Any]], int]:
+        self.require_session(tenant_id, user_id, session_id)
+        model: Any = RESOURCE_MODELS["chat_messages"]
+        criteria = (model.tenant_id == tenant_id, model.session_id == session_id, model.deleted_at.is_(None))
+        rows = list(self.db.scalars(select(model).where(*criteria).order_by(model.created_at.desc(), model.id.desc()).offset((page - 1) * page_size).limit(page_size)))
+        total = int(self.db.scalar(select(func.count()).select_from(model).where(*criteria)) or 0)
+        return [ResourceService.to_dict(row) for row in reversed(rows)], total
 
     def get_message(self, tenant_id: str, message_id: str) -> dict[str, Any]:
         return ResourceService.to_dict(self.resources.get("chat_messages", tenant_id, message_id))
 
     def feedback_message(self, tenant_id: str, user_id: str, message_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         msg = self.resources.get("chat_messages", tenant_id, message_id)
+        self.require_session(tenant_id, user_id, msg.session_id)
         spec = dict(msg.spec or {})
         spec["feedback"] = {
             "rating": payload.get("rating"),
@@ -133,110 +160,85 @@ class ChatService:
         return ResourceService.to_dict(row)
 
     def regenerate_message(self, tenant_id: str, user_id: str, session_id: str, message_id: str) -> dict[str, Any]:
+        self.require_session(tenant_id, user_id, session_id)
         msg = self.resources.get("chat_messages", tenant_id, message_id)
-        spec = dict(msg.spec or {})
-        spec["status"] = "regenerated"
-        self.resources.update("chat_messages", tenant_id, user_id, message_id, {"status": "regenerated", "spec": spec})
-        return {"session_id": session_id, "original_message_id": message_id, "status": "regenerating"}
+        if msg.session_id != session_id or (msg.spec or {}).get("role") != "assistant":
+            raise AppError(ErrorCode.VALIDATION_ERROR, "target must be an assistant message in this session", 422)
+        parent = self.resources.get("chat_messages", tenant_id, msg.parent_id) if msg.parent_id else None
+        if parent is None:
+            model: Any = RESOURCE_MODELS["chat_messages"]
+            rows = self.db.scalars(select(model).where(model.tenant_id == tenant_id, model.session_id == session_id,
+                model.created_at <= msg.created_at, model.id != msg.id, model.deleted_at.is_(None)).order_by(model.created_at.desc())).all()
+            parent = next((r for r in rows if (r.spec or {}).get("role") == "user"), None)
+        if parent is None or parent.session_id != session_id:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "original user message not found", 422)
+        return {"content": (parent.spec or {}).get("content", ""), "_parent_id": parent.id, "_regenerate_id": msg.id}
 
     async def stream_reply(self, tenant_id: str, user_id: str, session_id: str, payload: dict[str, Any]) -> AsyncGenerator[str, None]:
-        content = str(payload.get("content", ""))
-        self.send_message(tenant_id, user_id, session_id, {"content": content, "role": "user"})
-
-        session = self.resources.get("chat_sessions", tenant_id, session_id)
+        session = self.require_session(tenant_id, user_id, session_id)
+        content = str(payload.get("content", "")).strip()
+        if not content:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "message content is required", 422)
         spec = dict(session.spec or {})
-        agent_id = spec.get("agent_id", "")
-        context_window = spec.get("context_window", 20)
-        knowledge_base_ids = spec.get("knowledge_base_ids", [])
-        tool_ids = spec.get("tool_ids", [])
-
-        context_messages = self._build_context(tenant_id, session_id, context_window)
-        rag_context = self._retrieve_knowledge(tenant_id, user_id, knowledge_base_ids, content) if knowledge_base_ids else []
-
-        start_time = time.time()
-        reply_id = f"msg-{uuid.uuid4().hex[:8]}"
-
-        yield self._sse_event("message_start", {"message_id": reply_id, "agent_id": agent_id})
-
-        if rag_context:
-            yield self._sse_event("rag_context", {"sources": rag_context})
-
+        agent_id = str(spec.get("agent_id") or "")
+        context = self._build_context(tenant_id, session_id, int(spec.get("context_window") or 20))
+        if payload.get("_parent_id"):
+            parent = self.resources.get("chat_messages", tenant_id, str(payload["_parent_id"]))
+            # Only the history before the original request belongs in a regeneration.
+            model: Any = RESOURCE_MODELS["chat_messages"]
+            rows = self.db.scalars(select(model).where(model.tenant_id == tenant_id, model.session_id == session_id,
+                model.created_at < parent.created_at, model.status == "sent", model.deleted_at.is_(None)).order_by(model.created_at.desc()).limit(int(spec.get("context_window") or 20))).all()
+            context = [{"role": r.spec.get("role", "user"), "content": r.spec.get("content", "")} for r in reversed(rows)]
+        else:
+            parent = self.resources.get("chat_messages", tenant_id, self.send_message(tenant_id, user_id, session_id, {"content": content})["id"])
+        started = time.perf_counter()
+        reply = self.resources.create("chat_messages", tenant_id, user_id, {
+            "name": "reply", "status": "running", "session_id": session_id, "agent_id": agent_id,
+            "user_id": user_id, "parent_id": parent.id,
+            "spec": {"role": "assistant", "content": "", "regenerates": payload.get("_regenerate_id", ""),
+                     "delivery_mode": "buffered", "token_usage_source": "estimated"}})
+        yield self._sse_event("message_start", {"message_id": reply.id, "agent_id": agent_id, "delivery_mode": "buffered"})
         try:
-            full_response = await self._call_agent(tenant_id, user_id, agent_id, session_id, content, context_messages, rag_context, tool_ids, spec)
+            execution = await self._call_agent(tenant_id, user_id, agent_id, session_id, content, context, [], list(spec.get("tool_ids") or []), spec)
+            details = execution if isinstance(execution, dict) else {"response": execution}
+            if details.get("status") == "waiting_approval":
+                self.resources.update("chat_messages", tenant_id, user_id, reply.id, {"status": "waiting_approval",
+                    "spec": {**reply.spec, "approval_id": details.get("approval_id"), "tool_calls": details.get("tool_calls", [])}})
+                yield self._sse_event("approval_required", {"message_id": reply.id, "approval_id": details.get("approval_id")})
+                return
+            response = str(details.get("response") or "")
+            sources = (details.get("rag") or {}).get("sources", [])
+            if sources:
+                yield self._sse_event("rag_context", {"sources": sources})
+            reply_spec = {**reply.spec, "content": response, "rag_sources": sources, "tool_calls": details.get("tool_calls", []),
+                          "model_id": details.get("model_id", ""),
+                          "token_usage_source": "provider" if details.get("token_usage") else "estimated", "latency_ms": int((time.perf_counter() - started) * 1000),
+                          "token_usage": details.get("token_usage") or self._estimate_tokens(content, response)}
+            self.resources.update("chat_messages", tenant_id, user_id, reply.id, {"status": "sent", "spec": reply_spec})
+            if payload.get("_regenerate_id"):
+                self.resources.update("chat_messages", tenant_id, user_id, str(payload["_regenerate_id"]), {"status": "regenerated"})
+            yield self._sse_event("content_delta", {"delta": response})
+            yield self._sse_event("message_end", {"message_id": reply.id, "token_usage": reply_spec["token_usage"],
+                "token_usage_source": reply_spec["token_usage_source"], "latency_ms": reply_spec["latency_ms"]})
+        except asyncio.CancelledError:
+            self.resources.update("chat_messages", tenant_id, user_id, reply.id, {"status": "cancelled"})
+            raise
         except Exception as exc:
-            latency_ms = int((time.time() - start_time) * 1000)
-            failed = self.resources.create("chat_messages", tenant_id, user_id, {
-                "name": f"failed reply {reply_id}",
-                "code": reply_id,
-                "status": "failed",
-                "session_id": session_id,
-                "agent_id": agent_id,
-                "user_id": "assistant",
-                "error_message": str(exc),
-                "spec": {
-                    "role": "assistant",
-                    "content": "",
-                    "attachments": [],
-                    "token_usage": {},
-                    "latency_ms": latency_ms,
-                    "model_id": spec.get("model_id", ""),
-                    "feedback": None,
-                    "rag_sources": rag_context,
-                    "tool_calls": [],
-                    "metadata": {"error": str(exc)},
-                },
-            })
-            yield self._sse_event("error", {"message_id": failed.id, "error": str(exc), "latency_ms": latency_ms})
-            return
-
-        chunks = self._split_into_chunks(full_response)
-        for i, chunk in enumerate(chunks):
-            yield self._sse_event("content_delta", {"index": i, "delta": chunk})
-            await asyncio.sleep(0.02)
-
-        latency_ms = int((time.time() - start_time) * 1000)
-        token_usage = self._estimate_tokens(content, full_response)
-
-        assistant_msg = self.resources.create("chat_messages", tenant_id, user_id, {
-            "name": full_response[:80] if full_response else "reply",
-            "code": reply_id,
-            "status": "sent",
-            "session_id": session_id,
-            "agent_id": agent_id,
-            "user_id": "assistant",
-            "spec": {
-                "role": "assistant",
-                "content": full_response,
-                "attachments": [],
-                "token_usage": token_usage,
-                "latency_ms": latency_ms,
-                "model_id": spec.get("model_id", ""),
-                "feedback": None,
-                "rag_sources": rag_context,
-                "tool_calls": [],
-                "thinking": "",
-                "metadata": {},
-            },
-        })
-
-        session_spec = dict(session.spec or {})
-        session_spec["message_count"] = session_spec.get("message_count", 0) + 2
-        session_spec["last_message_at"] = datetime.now(timezone.utc).isoformat()
-        self.resources.update("chat_sessions", tenant_id, user_id, session_id, {"spec": session_spec})
-
-        yield self._sse_event("message_end", {
-            "message_id": assistant_msg.id,
-            "token_usage": token_usage,
-            "latency_ms": latency_ms,
-            "model_id": spec.get("model_id", ""),
-        })
+            self.resources.update("chat_messages", tenant_id, user_id, reply.id, {"status": "failed", "error_message": str(exc)})
+            yield self._sse_event("error", {"message_id": reply.id, "error": str(exc)})
+        finally:
+            model = RESOURCE_MODELS["chat_messages"]
+            count = self.db.scalar(select(func.count()).select_from(model).where(model.tenant_id == tenant_id,
+                model.session_id == session_id, model.deleted_at.is_(None)))
+            self.resources.update("chat_sessions", tenant_id, user_id, session_id, {"spec": {**session.spec,
+                "message_count": count, "last_message_at": datetime.now(timezone.utc).isoformat()}})
 
     async def _call_agent(
         self, tenant_id: str, user_id: str, agent_id: str, session_id: str,
         prompt: str, context: list[dict[str, str]], rag_context: list[dict[str, Any]],
         tool_ids: list[str], session_spec: dict[str, Any],
-    ) -> str:
-        model_id = str(session_spec.get("model_id") or "")
+    ) -> dict[str, Any]:
+        model_id = str(session_spec.get("model_id") or "") if not agent_id else ""
         if model_id:
             from app.services.settings.model_services import ModelInvocationService
 
@@ -261,7 +263,8 @@ class ChatService:
                     "tool_ids": tool_ids,
                 },
             )
-            return str((invocation.get("result") or {}).get("content") or "")
+            result = invocation.get("result") or {}
+            return {"response": result.get("content", ""), "token_usage": result.get("usage", {}), "model_id": model_id}
         if agent_id:
             from app.services.runtime.agent_runner_service import AgentRunnerService
 
@@ -273,13 +276,10 @@ class ChatService:
                     "prompt": prompt,
                     "session_id": session_id,
                     "context": context,
-                    "knowledge_base_ids": session_spec.get("knowledge_base_ids", []),
-                    "tool_ids": session_spec.get("tool_ids", []),
-                    "guardrail_policy_ids": session_spec.get("guardrail_policy_ids", []),
-                    "memory_policy": {"enabled": session_spec.get("memory_enabled", True), "write_scope": "session", "include_shared": True},
+
                 }
             )
-            return str(result.get("response", ""))
+            return result
         from app.core.constants import ErrorCode
         from app.core.errors import AppError
 
@@ -288,33 +288,12 @@ class ChatService:
     def _build_context(self, tenant_id: str, session_id: str, window: int) -> list[dict[str, str]]:
         rows, _ = self.resources.list("chat_messages", tenant_id, 1, window, {"session_id": session_id})
         messages = []
-        for row in rows:
+        for row in reversed(rows):
+            if row.status != "sent":
+                continue
             spec = row.spec or {}
             messages.append({"role": spec.get("role", "user"), "content": spec.get("content", "")})
         return messages
-
-    def _retrieve_knowledge(self, tenant_id: str, user_id: str, kb_ids: list[str], query: str) -> list[dict[str, Any]]:
-        results = []
-        try:
-            from app.services.build.knowledge_service import KnowledgeService
-            ks = KnowledgeService(self.db)
-            for kb_id in kb_ids[:3]:
-                try:
-                    result = ks.retrieve(tenant_id, user_id, kb_id, {"query": query, "top_k": 3})
-                    for chunk in result.get("matches", []) + result.get("chunks", []):
-                        metadata = dict(chunk.get("metadata") or {})
-                        results.append({
-                            "knowledge_base_id": kb_id,
-                            "chunk_id": chunk.get("id", ""),
-                            "title": chunk.get("title") or metadata.get("document_name") or metadata.get("filename") or "",
-                            "content": chunk.get("content") or chunk.get("text", ""),
-                            "score": chunk.get("score", 0),
-                        })
-                except Exception:
-                    pass
-        except ImportError:
-            pass
-        return results
 
     def _get_session_agent_id(self, tenant_id: str, session_id: str) -> str:
         try:

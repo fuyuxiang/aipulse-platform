@@ -5,11 +5,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import TenantIdDep, get_db, require_permission
-from app.core.response import ListResponse
 from app.models.core import User
-from app.schemas.common import ResourceRead
 from app.services.runtime.chat_service import ChatService
-from app.services._shared.resource_service import ResourceService
 
 router = APIRouter(tags=["chat"])
 
@@ -21,6 +18,10 @@ def create_session(
     user: User = Depends(require_permission("chat:write")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
+    if payload.get("model_id") and not payload.get("agent_id"):
+        from app.services.settings.rbac_service import RBACService
+        from app.services._shared.auth_service import AuthService
+        RBACService(AuthService(db)).require(user, "models:read")
     return ChatService(db).create_session(tenant_id, user.id, dict(payload))
 
 
@@ -40,10 +41,10 @@ def list_sessions(
 def get_session(
     session_id: str,
     tenant_id: TenantIdDep,
-    _: User = Depends(require_permission("chat:read")),
+    user: User = Depends(require_permission("chat:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return ChatService(db).get_session(tenant_id, session_id)
+    return ChatService(db).get_session(tenant_id, session_id, user.id)
 
 
 @router.put("/chat/sessions/{session_id}")
@@ -94,10 +95,10 @@ def list_messages(
     tenant_id: TenantIdDep,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    _: User = Depends(require_permission("chat:read")),
+    user: User = Depends(require_permission("chat:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    items, total = ChatService(db).list_messages(tenant_id, session_id, page, page_size)
+    items, total = ChatService(db).list_messages(tenant_id, session_id, page, page_size, user.id)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -120,7 +121,8 @@ async def stream_reply(
     user: User = Depends(require_permission("chat:write")),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    generator = ChatService(db).stream_reply(tenant_id, user.id, session_id, dict(payload))
+    ChatService(db).require_session(tenant_id, user.id, session_id)
+    generator = ChatService(db).stream_reply(tenant_id, user.id, session_id, {"content": payload.get("content", "")})
     return StreamingResponse(generator, media_type="text/event-stream", headers={
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
@@ -148,16 +150,8 @@ async def regenerate_message(
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     service = ChatService(db)
-    service.regenerate_message(tenant_id, user.id, session_id, message_id)
-    msg = service.get_message(tenant_id, message_id)
-    parent_content = (msg.get("spec") or {}).get("content", "")
-    msgs, _ = service.list_messages(tenant_id, session_id, 1, 50)
-    user_msg_content = ""
-    for m in reversed(msgs):
-        if (m.get("spec") or {}).get("role") == "user":
-            user_msg_content = (m.get("spec") or {}).get("content", "")
-            break
-    generator = service.stream_reply(tenant_id, user.id, session_id, {"content": user_msg_content, "_regenerate": True})
+    payload = service.regenerate_message(tenant_id, user.id, session_id, message_id)
+    generator = service.stream_reply(tenant_id, user.id, session_id, payload)
     return StreamingResponse(generator, media_type="text/event-stream", headers={
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
