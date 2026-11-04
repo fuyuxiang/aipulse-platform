@@ -50,6 +50,8 @@ class ModelBridge:
         provider_type = str(model_config.get("provider_type") or "").lower()
         if provider_type in {"openai", "openai_compatible", "azure_openai"} or model_config.get("api_style") == "openai":
             return OpenAICompatibleProvider(model_config).provider
+        if provider_type not in {"", "echo_agent_native", "aipulse_local", "local"}:
+            raise ValueError(f"unsupported runtime provider: {provider_type}")
         return LocalEnterpriseProvider(model_config.get("model_name", "aipulse-local")).provider
 
 
@@ -67,7 +69,7 @@ class OpenAICompatibleProvider:
             async def chat(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None, model: str | None = None, tool_choice: str | dict | None = None, **kwargs: Any) -> Any:
                 from echo_agent.models.provider import LLMResponse, ToolCallRequest
 
-                if not api_key:
+                if not api_key and config.get("auth_scheme", "bearer") != "none":
                     raise RuntimeError("OpenAI-compatible provider requires api_key_env/api_key")
                 model_name = model or default_model
                 if not model_name:
@@ -82,7 +84,7 @@ class OpenAICompatibleProvider:
                     body["tools"] = tools
                 if tool_choice:
                     body["tool_choice"] = tool_choice
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", **extra_headers}
+                headers = {**({"Authorization": f"Bearer {api_key}"} if config.get("auth_scheme", "bearer") != "none" else {}), "Content-Type": "application/json", **extra_headers}
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(f"{api_base}/chat/completions", headers=headers, json=body)
                 response.raise_for_status()
@@ -114,11 +116,11 @@ class OpenAICompatibleProvider:
                 return default_model
 
             async def embed(self, text: str, model: str | None = None) -> list[float] | None:
-                if not api_key:
+                if not api_key and config.get("auth_scheme", "bearer") != "none":
                     raise RuntimeError("OpenAI-compatible provider requires api_key_env/api_key")
                 model_name = model or str(config.get("embedding_model_name") or default_model)
                 body = {"model": model_name, "input": text}
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", **extra_headers}
+                headers = {**({"Authorization": f"Bearer {api_key}"} if config.get("auth_scheme", "bearer") != "none" else {}), "Content-Type": "application/json", **extra_headers}
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(f"{api_base}/embeddings", headers=headers, json=body)
                 response.raise_for_status()

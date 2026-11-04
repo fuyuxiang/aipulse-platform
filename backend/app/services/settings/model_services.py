@@ -43,12 +43,14 @@ class ModelInvocationService:
             raise AppError(ErrorCode.BUSINESS_ERROR, "model disabled", 409)
         started = time.perf_counter()
         status = "success"
+        failure_status = 502
         error_message = ""
         try:
             context = self._resolve_model_context(tenant_id, model)
             result = await self._invoke_with_provider(model_type, payload, context)
         except AppError as exc:
             status = "failed"
+            failure_status = exc.status_code
             error_message = exc.message
             result = {"error": exc.message, "code": exc.code}
         except Exception as exc:
@@ -97,7 +99,7 @@ class ModelInvocationService:
                 },
             )
         if status == "failed":
-            raise AppError(ErrorCode.BUSINESS_ERROR, error_message or "model invocation failed", 502)
+            raise AppError(ErrorCode.BUSINESS_ERROR, error_message or "model invocation failed", failure_status)
         return {"model_id": model_id, "model_type": model_type, "latency_ms": latency_ms, "cost": cost, "result": result}
 
     def _resolve_model_context(self, tenant_id: str, model: Any) -> dict[str, Any]:
@@ -147,7 +149,7 @@ class ModelInvocationService:
 
     async def _openai_compatible_invoke(self, model_type: str, payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
         api_key = self._api_key(config)
-        if not api_key:
+        if not api_key and config.get("auth_scheme", "bearer") != "none":
             raise AppError(ErrorCode.VALIDATION_ERROR, "model provider api key is required; set api_key_env or OPENAI_API_KEY", 422)
         base_url = str(config.get("api_base") or config.get("base_url") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
         model_name = str(config.get("model_name") or config.get("model") or "")
@@ -155,7 +157,7 @@ class ModelInvocationService:
             raise AppError(ErrorCode.VALIDATION_ERROR, "model_name is required", 422)
         timeout = float(config.get("timeout_seconds") or 120)
         headers = {
-            "Authorization": f"Bearer {api_key}",
+            **({"Authorization": f"Bearer {api_key}"} if config.get("auth_scheme", "bearer") != "none" else {}),
             "Content-Type": "application/json",
             **dict(config.get("extra_headers") or {}),
         }
@@ -164,7 +166,7 @@ class ModelInvocationService:
             body = {"model": model_name, "input": texts}
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(f"{base_url}/embeddings", headers=headers, json=body)
-            response.raise_for_status()
+            self._check_provider_response(response)
             data = response.json()
             usage = self._normalize_usage(dict(data.get("usage") or {}))
             return {"embeddings": [item.get("embedding", []) for item in data.get("data", [])], "usage": usage, "model": data.get("model", model_name)}
@@ -178,9 +180,11 @@ class ModelInvocationService:
             }
             if payload.get("tools"):
                 body["tools"] = payload["tools"]
+                if payload.get("tool_choice"):
+                    body["tool_choice"] = payload["tool_choice"]
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(f"{base_url}/chat/completions", headers=headers, json=body)
-            response.raise_for_status()
+            self._check_provider_response(response)
             data = response.json()
             choice = (data.get("choices") or [{}])[0]
             message = dict(choice.get("message") or {})
@@ -197,7 +201,7 @@ class ModelInvocationService:
             body = {"model": model_name, "input": payload.get("text") or payload.get("input") or ""}
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(f"{base_url}{endpoint}", headers=headers, json=body)
-            response.raise_for_status()
+            self._check_provider_response(response)
             data = response.json()
             result = (data.get("results") or [{}])[0]
             categories = dict(result.get("categories") or {})
@@ -222,11 +226,26 @@ class ModelInvocationService:
         body = {"model_type": model_type, "model": config.get("model_name"), **payload}
         async with httpx.AsyncClient(timeout=float(config.get("timeout_seconds") or 120)) as client:
             response = await client.request(str(config.get("method") or "POST").upper(), url, headers=headers, json=body)
-        response.raise_for_status()
+        self._check_provider_response(response)
         if "application/json" in response.headers.get("content-type", ""):
             data = response.json()
             return data if isinstance(data, dict) else {"data": data, "usage": {}}
         return {"content": response.text, "usage": {"output_tokens": len(response.text.split())}}
+
+    @staticmethod
+    def _check_provider_response(response: httpx.Response) -> None:
+        if not response.is_error:
+            return
+        message = response.reason_phrase
+        try:
+            data = response.json()
+            if isinstance(data, dict):
+                error = data.get("error")
+                message = str(data.get("message") or (error.get("message") if isinstance(error, dict) else error) or message)
+        except ValueError:
+            pass
+        raise AppError(ErrorCode.RATE_LIMITED if response.status_code == 429 else ErrorCode.BUSINESS_ERROR,
+                       f"model provider HTTP {response.status_code}: {message[:300]}", 429 if response.status_code == 429 else 502)
 
     @staticmethod
     def _api_key(config: dict[str, Any]) -> str:

@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
 from app.core.constants import ErrorCode
 from app.core.errors import AppError
+from app.models.resources import RESOURCE_MODELS
 from app.services._shared.resource_service import ResourceService
 
 
@@ -22,21 +24,11 @@ class ToolService:
         arguments = dict(payload.get("arguments") or payload.get("payload") or {})
         self._validate_schema(dict((tool.spec or {}).get("schema") or (tool.config or {}).get("schema") or {}), arguments)
         self._check_rate_limit(tenant_id, tool)
-        if self._requires_approval(tool, payload):
-            approval = self.resources.create(
-                "tool_approval_tasks",
-                tenant_id,
-                user_id,
-                {
-                    "name": f"approve {tool.name}",
-                    "status": "pending",
-                    "parent_id": tool.id,
-                    "tool_name": tool.name,
-                    "input_payload": {"arguments": arguments, "reason": payload.get("reason", "")},
-                    "spec": {"risk_level": self._risk_level(tool), "tool_id": tool.id},
-                },
-            )
-            return {"status": "waiting_approval", "approval_id": approval.id, "tool_id": tool.id}
+        if self._requires_approval(tool):
+            if payload.get("approval_id"):
+                self._consume_approval(tenant_id, user_id, tool, arguments, str(payload["approval_id"]))
+            else:
+                return self._request_approval(tenant_id, user_id, tool, arguments, payload)
         started = time.perf_counter()
         try:
             output = await self._execute(tool, arguments)
@@ -48,25 +40,51 @@ class ToolService:
             error_message = str(exc)
         latency_ms = int((time.perf_counter() - started) * 1000)
         log = self.resources.create(
-            "tool_call_logs",
-            tenant_id,
-            user_id,
-            {
-                "name": f"invoke {tool.name}",
-                "status": status,
-                "parent_id": tool.id,
-                "tool_name": tool.name,
-                "latency_ms": latency_ms,
-                "input_payload": {"arguments": arguments},
-                "output_payload": output,
-                "error_message": error_message,
-            },
+            "tool_call_logs", tenant_id, user_id,
+            {"name": f"invoke {tool.name}", "status": status, "parent_id": tool.id,
+             "tool_name": tool.name, "latency_ms": latency_ms, "input_payload": {"arguments": arguments},
+             "output_payload": output, "error_message": error_message},
         )
         if status == "failed":
             raise AppError(ErrorCode.BUSINESS_ERROR, error_message, 500)
         return {"status": status, "tool_id": tool.id, "log_id": log.id, "latency_ms": latency_ms, "output": output}
 
+    def _request_approval(self, tenant_id: str, user_id: str, tool: Any, arguments: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        approval = self.resources.create(
+            "tool_approval_tasks",
+            tenant_id,
+            user_id,
+            {
+                "name": f"approve {tool.name}",
+                "status": "pending",
+                "parent_id": tool.id,
+                "tool_name": tool.name,
+                "input_payload": {"arguments": arguments, "reason": payload.get("reason", "")},
+                "spec": {"risk_level": self._risk_level(tool), "tool_id": tool.id,
+                         "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()},
+            },
+        )
+        return {"status": "waiting_approval", "approval_id": approval.id, "tool_id": tool.id}
+
+    def _consume_approval(self, tenant_id: str, user_id: str, tool: Any, arguments: dict[str, Any], approval_id: str) -> None:
+        approval = self.resources.get("tool_approval_tasks", tenant_id, approval_id)
+        expires_at = (approval.spec or {}).get("expires_at")
+        if (approval.status != "approved" or approval.parent_id != tool.id or approval.created_by != user_id
+                or (approval.input_payload or {}).get("arguments") != arguments or not expires_at
+                or datetime.fromisoformat(expires_at).replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)):
+            raise AppError(ErrorCode.FORBIDDEN, "approval is invalid, expired, consumed, or does not match this request", 403)
+        model: Any = RESOURCE_MODELS["tool_approval_tasks"]
+        result = self.resources.db.execute(update(model).where(
+            model.id == approval.id, model.tenant_id == tenant_id, model.status == "approved"
+        ).values(status="consumed"))
+        self.resources.db.commit()
+        if result.rowcount != 1:
+            raise AppError(ErrorCode.FORBIDDEN, "approval already consumed", 403)
+
     def approve_task(self, tenant_id: str, user_id: str, approval_id: str, approved: bool, payload: dict[str, Any]) -> dict[str, Any]:
+        current = self.resources.get("tool_approval_tasks", tenant_id, approval_id)
+        if current.status != "pending":
+            raise AppError(ErrorCode.BUSINESS_ERROR, "approval has already been decided", 409)
         approval = self.resources.update(
             "tool_approval_tasks",
             tenant_id,
@@ -139,6 +157,7 @@ class ToolService:
                 raise AppError(ErrorCode.VALIDATION_ERROR, "http tool requires url", 422)
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.request(method, url, json=arguments.get("json"))
+                response.raise_for_status()
             return {"status_code": response.status_code, "text": response.text[:2000], "headers": dict(response.headers)}
         if kind == "sleep":
             await asyncio.sleep(min(timeout, float(arguments.get("seconds", 0))))
@@ -154,9 +173,7 @@ class ToolService:
         if len(recent) >= limit:
             raise AppError(ErrorCode.RATE_LIMITED, "tool rate limit exceeded", 429)
 
-    def _requires_approval(self, tool: Any, payload: dict[str, Any]) -> bool:
-        if payload.get("approval_id") or payload.get("approved"):
-            return False
+    def _requires_approval(self, tool: Any) -> bool:
         risk = self._risk_level(tool)
         return bool((tool.spec or {}).get("requires_approval") or risk in {"high", "critical"})
 

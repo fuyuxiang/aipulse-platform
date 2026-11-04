@@ -49,7 +49,7 @@ def approve_tool(
     approval_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
-    user: User = Depends(require_permission("tools:write")),
+    user: User = Depends(require_permission("tools:approve")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     return ToolService(db).approve_task(tenant_id, user.id, approval_id, True, dict(payload))
@@ -60,7 +60,7 @@ def reject_tool(
     approval_id: str,
     tenant_id: TenantIdDep,
     payload: dict[str, object] = Body(default_factory=dict),
-    user: User = Depends(require_permission("tools:write")),
+    user: User = Depends(require_permission("tools:approve")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     return ToolService(db).approve_task(tenant_id, user.id, approval_id, False, dict(payload))

@@ -5,6 +5,6 @@ from typing import Any
 
 class MemoryBridge:
     def apply_policy(self, agent_loop: Any, policy: dict[str, Any]) -> None:
-        if policy.get("disabled") and hasattr(agent_loop, "config"):
+        if (policy.get("disabled") or policy.get("enabled") is False) and hasattr(agent_loop, "config"):
             agent_loop.config.memory.enabled = False
 

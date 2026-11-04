@@ -263,7 +263,7 @@ class GuardrailService:
         }
 
     def _check_pii(self, content: str, config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-        violations = []
+        violations: list[dict[str, Any]] = []
         masked = content
         patterns_to_check = config.get("patterns", list(self.PII_PATTERNS.keys()))
         action = config.get("action", "mask")
@@ -289,7 +289,7 @@ class GuardrailService:
         return violations, masked
 
     def _check_injection(self, content: str, config: dict[str, Any]) -> list[dict[str, Any]]:
-        violations = []
+        violations: list[dict[str, Any]] = []
         sensitivity = config.get("sensitivity", "medium")
         action = config.get("action", "block")
 
@@ -335,7 +335,7 @@ class GuardrailService:
         return violations
 
     def _check_content_safety(self, content: str, config: dict[str, Any]) -> list[dict[str, Any]]:
-        violations = []
+        violations: list[dict[str, Any]] = []
         categories = config.get("categories", list(self.UNSAFE_CONTENT_KEYWORDS.keys()))
         action = config.get("action", "block")
 
@@ -356,7 +356,7 @@ class GuardrailService:
         return violations
 
     def _check_output_format(self, content: str, config: dict[str, Any]) -> list[dict[str, Any]]:
-        violations = []
+        violations: list[dict[str, Any]] = []
         max_length = config.get("max_length", 10000)
         required_format = config.get("format", "text")
 
@@ -399,7 +399,7 @@ class GuardrailService:
         return violations
 
     def _check_hallucination(self, content: str, knowledge_context: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
-        violations = []
+        violations: list[dict[str, Any]] = []
         threshold = config.get("threshold", 0.7)
         action = config.get("action", "warn")
 
@@ -434,8 +434,7 @@ class GuardrailService:
         return violations
 
     def _check_topic(self, content: str, config: dict[str, Any]) -> list[dict[str, Any]]:
-        violations = []
-        allowed_topics = config.get("allowed_topics", [])
+        violations: list[dict[str, Any]] = []
         blocked_topics = config.get("blocked_topics", [])
 
         content_lower = content.lower()
@@ -453,7 +452,7 @@ class GuardrailService:
         return violations
 
     def _check_custom_rule(self, content: str, rule: dict[str, Any]) -> list[dict[str, Any]]:
-        violations = []
+        violations: list[dict[str, Any]] = []
         rule_type = rule.get("type", "regex")
         pattern = rule.get("pattern", "")
         action = rule.get("action", "warn")
