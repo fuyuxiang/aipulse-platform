@@ -86,7 +86,8 @@ def render_template(
     _: User = Depends(require_permission("agents:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    variables = {k: str(v) for k, v in payload.get("variables", {}).items()}
+    raw = payload.get("variables")
+    variables = {k: str(v) for k, v in raw.items()} if isinstance(raw, dict) else {}
     return PromptStudioService(db).render_template(tenant_id, template_id, variables)
 
 

@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.services._shared.resource_service import ResourceService
+from app.core.constants import ErrorCode
+from app.core.errors import AppError
 
 
 class EvaluationService:
@@ -14,12 +16,14 @@ class EvaluationService:
 
     def run(self, tenant_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         cases = payload.get("cases", [])
+        if not cases or any("actual" not in case for case in cases):
+            raise AppError(ErrorCode.VALIDATION_ERROR, "imported-answer evaluation requires nonempty cases with actual answers", 422)
         results = []
         for index, case in enumerate(cases):
             expected = str(case.get("expected", "")).strip().lower()
-            actual = str(case.get("actual", case.get("input", ""))).strip().lower()
-            score = 1.0 if expected and expected in actual else float(case.get("score", 0.0))
-            results.append({"case_index": index, "score": score, "latency_ms": int(case.get("latency_ms", 0)), "cost": float(case.get("cost", 0))})
+            actual = str(case["actual"]).strip().lower()
+            score = 1.0 if expected and expected == actual else 0.0
+            results.append({"case_index": index, "input": case.get("input", ""), "expected": case.get("expected", ""), "actual": case["actual"], "score": score, "latency_ms": int(case.get("latency_ms", 0)), "cost": float(case.get("cost", 0))})
         metrics = {
             "accuracy": mean([item["score"] for item in results]) if results else 0.0,
             "latency_ms": mean([item["latency_ms"] for item in results]) if results else 0.0,
@@ -30,7 +34,7 @@ class EvaluationService:
             "evaluation_runs",
             tenant_id,
             user_id,
-            {"name": payload.get("name", "evaluation run"), "status": "completed", "input_payload": payload, "output_payload": {"metrics": metrics, "results": results}},
+            {"name": payload.get("name", "evaluation run"), "status": "completed", "input_payload": payload, "spec": {"execution_mode": "imported_answers", "scoring_method": "normalized_exact_match"}, "output_payload": {"metrics": metrics, "results": results}},
         )
         for result in results:
             self.resources.create(
@@ -49,7 +53,7 @@ class EvaluationService:
                 },
             )
         self.resources.create("evaluation_metrics", tenant_id, user_id, {"name": "evaluation metrics", "parent_id": run.id, "spec": metrics})
-        return {"run_id": run.id, "metrics": metrics, "results": results}
+        return {"run_id": run.id, "execution_mode": "imported_answers", "scoring_method": "normalized_exact_match", "metrics": metrics, "results": results}
 
     def prompt_compare(self, tenant_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         prompts = [str(item) for item in payload.get("prompts", [])]
