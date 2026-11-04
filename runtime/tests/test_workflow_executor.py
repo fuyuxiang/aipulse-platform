@@ -16,7 +16,8 @@ async def test_workflow_executor_orders_and_runs_nodes() -> None:
 
     result = await executor.run(nodes, edges, {"default": handler})
     assert result["status"] == "success"
-    assert result["results"]["b"]["seen"] == ["a"]
+    assert result["results"]["a"]["output"] == {"node": "a", "seen": []}
+    assert result["results"]["b"]["output"] == {"node": "b", "seen": ["a", "node", "seen"]}
 
 
 def test_workflow_executor_rejects_cycles() -> None:

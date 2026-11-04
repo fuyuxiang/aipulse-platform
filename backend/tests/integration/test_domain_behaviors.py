@@ -94,7 +94,7 @@ def test_tool_schema_approval_execution_and_mcp_sync() -> None:
     approved = client.post(f"/api/v1/tool-approval-tasks/{waiting.json()['approval_id']}/approve", headers=auth, json={"comment": "approved"})
     assert approved.status_code == 200
     assert approved.json()["approved"] is True
-    executed = client.post(f"/api/v1/tools/{tool_id}/invoke", headers=auth, json={"approved": True, "arguments": {"numbers": [1, 2, 3]}})
+    executed = client.post(f"/api/v1/tools/{tool_id}/invoke", headers=auth, json={"approval_id": waiting.json()["approval_id"], "arguments": {"numbers": [1, 2, 3]}})
     assert executed.status_code == 200
     assert executed.json()["output"]["value"] == 6.0
     server = client.post("/api/v1/mcp-servers", headers=auth, json={"name": "Local MCP", "spec": {"tools": [{"name": "search", "schema": {}}]}})

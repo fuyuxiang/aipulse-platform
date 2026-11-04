@@ -38,13 +38,14 @@ def test_agent_model_knowledge_memory_security_evaluation_flow() -> None:
 def test_runtime_debug_run_uses_echo_agent_adapter() -> None:
     client = TestClient(app)
     auth = headers(client)
-    created = client.post("/api/v1/runtime/agents/test-agent/instances", headers=auth, json={"session_id": "it", "resource_limits": {"timeout_seconds": 30}})
+    agent = client.post("/api/v1/agents", headers=auth, json={"name": "Adapter Agent"}).json()
+    created = client.post(f"/api/v1/runtime/agents/{agent['id']}/instances", headers=auth, json={"session_id": "it", "resource_limits": {"timeout_seconds": 30}})
     assert created.status_code == 200
     instance_id = created.json()["id"]
     started = client.post(f"/api/v1/runtime/instances/{instance_id}/start", headers=auth)
     assert started.status_code == 200
     assert started.json()["status"] == "running"
-    run = client.post("/api/v1/runtime/agents/test-agent/debug-run", headers=auth, json={"prompt": "hello", "session_id": "it"})
+    run = client.post(f"/api/v1/runtime/agents/{agent['id']}/debug-run", headers=auth, json={"prompt": "hello", "session_id": "it"})
     assert run.status_code == 200
     assert "response" in run.json()
     stopped = client.post(f"/api/v1/runtime/instances/{instance_id}/stop", headers=auth)
