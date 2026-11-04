@@ -30,15 +30,15 @@ export function LoginPage(): JSX.Element {
         <div className="login-brand-row">
           <div className="app-logo-mark app-logo-mark-large">AP</div>
           <div>
-            <Typography.Title level={2}>AIPulse AgentOS</Typography.Title>
+            <Typography.Title level={2}>AIPulse</Typography.Title>
             <Typography.Text>企业级智能体研发、运行与治理平台</Typography.Text>
           </div>
         </div>
         <Row gutter={[12, 12]} className="login-capability-grid">
           {[
             { icon: <ApartmentOutlined />, title: '多智能体协作', text: '团队拓扑、委派策略、运行追踪' },
-            { icon: <CloudServerOutlined />, title: '生产运行面', text: '调度、会话、发布、市场分发' },
-            { icon: <SafetyCertificateOutlined />, title: '安全治理', text: '护栏、权限、审计、合规矩阵' },
+            { icon: <CloudServerOutlined />, title: '运行与发布', text: '会话调试、工作流与版本发布' },
+            { icon: <SafetyCertificateOutlined />, title: '安全治理', text: '护栏、权限与操作审计' },
             { icon: <DatabaseOutlined />, title: '知识与记忆', text: 'RAG、长期记忆、上下文压缩' },
           ].map((item) => (
             <Col span={12} key={item.title}>
@@ -56,10 +56,10 @@ export function LoginPage(): JSX.Element {
         title={
           <Space direction="vertical" size={2}>
             <Typography.Text strong>登录控制台</Typography.Text>
-            <Typography.Text type="secondary">智能体基础设施平台</Typography.Text>
+            <Typography.Text type="secondary">智能体构建、协作与治理平台</Typography.Text>
           </Space>
         }
-        extra={<Tag color="processing">企业版</Tag>}
+        extra={<Tag color="processing">本地开发版</Tag>}
       >
         <Form layout="vertical" initialValues={{ tenant: 'default', username: 'admin' }} onFinish={(values) => void submit(values)}>
           <Form.Item name="tenant" label="租户" rules={[{ required: true }]}>

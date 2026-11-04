@@ -2,7 +2,7 @@ import type { PageConfig } from '../models/types';
 
 const pages: Array<[string, string, string, string, PageConfig['designer']?]> = [
   // ────────────── Home ──────────────
-  ['/home', '工作空间', '/observability/dashboard', '首页'],
+  ['/home', '工作台', '/observability/dashboard', '工作台'],
 
   // ────────────── Build ──────────────
   ['/build/agents', '智能体', '/agents', '构建'],
@@ -14,7 +14,8 @@ const pages: Array<[string, string, string, string, PageConfig['designer']?]> = 
   ['/build/prompts', '提示词', '/prompt-templates', '构建'],
 
   // ────────────── Playground ──────────────
-  ['/playground', '调试', '/chat/sessions', '调试'],
+  ['/playground', '对话', '/chat/sessions', '使用'],
+  ['/playground/multi', '团队协作', '/agent-teams', '使用'],
 
   // ────────────── Eval ──────────────
   ['/eval', '评测', '/evaluation/datasets', '评测'],
@@ -26,8 +27,8 @@ const pages: Array<[string, string, string, string, PageConfig['designer']?]> = 
   ['/observe/audit', '审计日志', '/audit-logs', '观测'],
 
   // ────────────── Deploy ──────────────
-  ['/deploy/channels', '发布渠道', '/marketplace/listings', '发布'],
-  ['/deploy/api-keys', 'API 凭证', '/system/configs', '发布'],
+  ['/deploy/channels', '资源市场', '/marketplace/listings', '发布'],
+  ['/deploy/api-keys', 'API 发布与凭证', '/agent-publications', '发布'],
   ['/deploy/versions', '版本发布', '/agents', '发布'],
 
   // ────────────── Settings ──────────────
@@ -57,7 +58,7 @@ export const legacyRedirects: Record<string, string> = {
   '/memory': '/build/agents',
   '/prompt-studio': '/build/prompts',
   '/chat': '/playground',
-  '/multi-agent': '/playground?mode=multi',
+  '/multi-agent': '/playground/multi',
   '/evaluation': '/eval',
   '/trace': '/observe/trace',
   '/cost-analytics': '/observe/cost',

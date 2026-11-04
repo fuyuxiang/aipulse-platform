@@ -5,9 +5,11 @@ module.exports = {
   entry: './src/main.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
+    clean: true,
     filename: '[name].[contenthash].js',
     publicPath: '/'
   },
+  optimization: { splitChunks: { chunks: 'all' }, runtimeChunk: 'single' },
   resolve: {
     extensions: ['.tsx', '.ts', '.js']
   },
@@ -19,7 +21,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      templateContent: '<!doctype html><html><head><meta charset="utf-8"/><title>AIPulse</title></head><body><div id="root"></div></body></html>'
+      templateContent: '<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>AIPulse</title></head><body><div id="root"></div></body></html>'
     })
   ],
   devServer: {
@@ -27,7 +29,7 @@ module.exports = {
     proxy: [
       {
         context: ['/api', '/health'],
-        target: 'http://127.0.0.1:8000',
+        target: process.env.AIPULSE_E2E_API_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true,
         ws: true
       }
