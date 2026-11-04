@@ -1,333 +1,885 @@
-import { createForm } from '@formily/core';
-import { FormProvider, Field } from '@formily/react';
-import { FormItem, Input } from '@formily/antd-v5';
 import {
-  ApiOutlined,
-  CloudSyncOutlined,
-  DeploymentUnitOutlined,
-  FilterOutlined,
+  ArrowLeftOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SafetyCertificateOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
-import { Button, Card, Col, Drawer, Form, Input as AntInput, Row, Space, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import React, { useEffect, useMemo, useState } from 'react';
-import type { PageConfig, ResourceRecord } from '../models/types';
-import { api, getToken } from '../services/http';
-import { WorkflowDesigner } from '../workflow-designer/WorkflowDesigner';
-import { AgentWizard } from '../agent-designer/AgentWizard';
-import { FeatureWorkbench } from './FeatureWorkbench';
+} from "@ant-design/icons";
+import {
+  Alert,
+  Button,
+  Card,
+  Collapse,
+  Descriptions,
+  Drawer,
+  Dropdown,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  message,
+  Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Typography,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
+import React, {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { pagePermission, useAccess } from "../access/context";
+import type { PageConfig, ResourceRecord } from "../models/types";
+import { api } from "../services/http";
+const WorkflowDesigner = lazy(() =>
+  import("../workflow-designer/WorkflowDesigner").then((module) => ({
+    default: module.WorkflowDesigner,
+  })),
+);
+const AgentWizard = lazy(() =>
+  import("../agent-designer/AgentWizard").then((module) => ({
+    default: module.AgentWizard,
+  })),
+);
+import {
+  FeatureWorkbench,
+  featureWorkbenchInternals,
+} from "./FeatureWorkbench";
+import { formatTime, PageHeader, parseObject, StatusTag } from "./PageHeader";
 
-interface Props {
-  page: PageConfig;
-}
-
-interface PageMeta {
-  domain: string;
-  description: string;
-  owner: string;
-  objective: string;
-}
-
-const PAGE_META: Record<string, PageMeta> = {
-  '/agents': {
-    domain: '智能体管理',
-    description: '统一管理企业智能体资产，包括版本控制、发布管理和运行策略配置。',
-    owner: '智能体研发中心',
-    objective: '生产可用',
-  },
-  '/workflows': {
-    domain: '工作流编排',
-    description: '可视化编排工具、模型、知识库和人工审批节点，支撑端到端业务自动化。',
-    owner: '流程自动化平台',
-    objective: '稳定编排',
-  },
-  '/prompt-templates': {
-    domain: '提示词管理',
-    description: '管理提示词模板、变量、评测和版本，确保提示词资产可追踪可复用。',
-    owner: '提示词工程组',
-    objective: '质量一致',
-  },
-  '/tools': {
-    domain: '工具中心',
-    description: '接入内部系统和外部 API，提供统一的权限管控、调用管理和审计能力。',
-    owner: '平台连接器组',
-    objective: '安全调用',
-  },
-  '/knowledge-bases': {
-    domain: '知识库管理',
-    description: '统一管理企业知识源、索引构建、检索测试和上下文引用质量。',
-    owner: '知识工程组',
-    objective: '可信引用',
-  },
-  '/memories': {
-    domain: '记忆管理',
-    description: '管理长期记忆、会话沉淀、检索策略和上下文压缩。',
-    owner: '上下文工程组',
-    objective: '持续学习',
-  },
-  '/models': {
-    domain: '模型管理',
-    description: '统一管理模型供应商、模型版本、健康检查、路由和容错策略。',
-    owner: '模型平台组',
-    objective: '弹性供给',
-  },
-  '/model-routing-policies': {
-    domain: '模型路由',
-    description: '按成本、延迟、质量与合规约束智能调度模型，降低调用风险。',
-    owner: '模型平台组',
-    objective: '智能分流',
-  },
-  '/security/content-policies': {
-    domain: '安全策略',
-    description: '管理内容安全、工具权限、路径访问和高风险动作审批策略。',
-    owner: '安全治理组',
-    objective: '风险可控',
-  },
-  '/guardrails/policies': {
-    domain: '安全护栏',
-    description: '统一配置输入输出护栏、违规处置、数据脱敏与内容拦截策略。',
-    owner: '安全治理组',
-    objective: '合规运行',
-  },
-  '/evaluation/datasets': {
-    domain: '质量评测',
-    description: '维护评测数据集、运行记录和质量指标，支撑上线前验收。',
-    owner: '质量评测组',
-    objective: '可量化',
-  },
-  '/audit-logs': {
-    domain: '审计日志',
-    description: '追踪关键操作、敏感动作、发布变更和合规证据。',
-    owner: '平台治理组',
-    objective: '可追溯',
-  },
-  '/cost/summary': {
-    domain: '成本分析',
-    description: '分析模型、智能体、租户和业务线成本，支撑预算管理与优化。',
-    owner: '成本治理组',
-    objective: '成本透明',
-  },
-  '/alerts/rules': {
-    domain: '告警管理',
-    description: '配置运行告警规则、服务等级阈值和通知策略，保障业务连续性。',
-    owner: '运行保障组',
-    objective: '及时响应',
-  },
-  '/tenants': {
-    domain: '租户管理',
-    description: '管理企业租户、隔离域、资源配额和组织级策略。',
-    owner: '平台管理员',
-    objective: '多租户',
-  },
-  '/users': {
-    domain: '用户与权限',
-    description: '管理用户、角色、权限和组织成员访问边界。',
-    owner: '平台管理员',
-    objective: '最小权限',
-  },
-  '/roles': {
-    domain: '角色管理',
-    description: '维护平台角色、权限组合与适用范围，支撑细粒度访问控制。',
-    owner: '平台管理员',
-    objective: '权责清晰',
-  },
-  '/orgs': {
-    domain: '组织管理',
-    description: '管理租户内部的组织树、部门归属与资源可见性边界。',
-    owner: '平台管理员',
-    objective: '组织对齐',
-  },
-  '/system/configs': {
-    domain: '系统配置',
-    description: '维护平台级开关、运行参数、集成配置和基础设施能力。',
-    owner: '平台管理员',
-    objective: '可运维',
-  },
+const descriptions: Record<string, string> = {
+  "/agents": "配置智能体的模型、提示词与能力，创建后即可开始对话。",
+  "/workflows":
+    "管理可复用的业务流程，在编排器中连接节点、配置参数与验证流程。",
+  "/tools": "管理智能体可调用的工具与参数，按需配置调用权限。",
+  "/knowledge-bases": "管理知识库、上传文档，并验证检索结果。",
+  "/models": "接入对话、向量和重排序模型，验证连接后供智能体使用。",
+  "/model-routing-policies": "配置模型选择与回退规则。",
+  "/evaluation/datasets": "管理评测数据，并对导入的实际回答进行评分。",
+  "/tenants": "管理企业租户与访问状态。",
 };
 
-function getPageMeta(page: PageConfig): PageMeta {
-  return PAGE_META[page.api] || {
-    domain: page.group,
-    description: `集中管理${page.title}资源，统一维护状态、配置和权限。`,
-    owner: '平台运营团队',
-    objective: '统一管控',
-  };
-}
-
-function statusColor(value?: string): string {
-  if (!value) return 'default';
-  if (['active', 'success', 'published', 'running', 'enabled'].includes(value)) return 'success';
-  if (['failed', 'error', 'blocked', 'disabled'].includes(value)) return 'error';
-  if (['pending', 'draft', 'gray', 'warning'].includes(value)) return 'warning';
-  return 'processing';
-}
-
-export function ResourcePage({ page }: Props): JSX.Element {
+export function ResourcePage({ page }: { page: PageConfig }): JSX.Element {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const { can } = useAccess();
+  const canWrite = can(
+    pagePermission({ ...page, designer: undefined }).replace(":read", ":write"),
+  );
   const [rows, setRows] = useState<ResourceRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const form = useMemo(() => createForm(), []);
-
-  const load = async (pageNo = 1): Promise<void> => {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [pageNo, setPageNo] = useState(1);
+  const [editing, setEditing] = useState<ResourceRecord | null | undefined>(
+    undefined,
+  );
+  const [detail, setDetail] = useState<ResourceRecord | null>(null);
+  const [operationRow, setOperationRow] = useState<ResourceRecord | null>(null);
+  const [form] = Form.useForm();
+  const providerType = Form.useWatch("provider_type", form);
+  const authScheme = Form.useWatch("auth_scheme", form);
+  const toolType = Form.useWatch("tool_type", form);
+  const [models, setModels] = useState<ResourceRecord[]>([]);
+  const requestId = useRef(0);
+  const load = useCallback(async (): Promise<void> => {
+    const id = ++requestId.current;
     setLoading(true);
+    setError("");
     try {
-      if (!getToken()) {
-        setRows([]);
-        setTotal(0);
+      const result = await api.list(page.api, pageNo, 20, {
+        name: search,
+        status,
+      });
+      if (id !== requestId.current) return;
+      if (!result.items.length && pageNo > 1) {
+        setPageNo((value) => value - 1);
         return;
       }
-      const result = await api.list(page.api, pageNo, 20);
-      const filtered = keyword ? result.items.filter((item) => `${item.name}${item.code}${item.status}`.includes(keyword)) : result.items;
-      setRows(filtered);
+      setRows(result.items);
       setTotal(result.total);
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '加载失败');
+    } catch (reason) {
+      if (id === requestId.current) {
+        setError((reason as Error).message);
+        setRows([]);
+      }
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
+    }
+  }, [page.api, pageNo, search, status]);
+  useEffect(() => {
+    if (!page.designer) void load();
+    return () => {
+      requestId.current++;
+    };
+  }, [load, page.designer]);
+  const label =
+    (
+      {
+        "/agents": "智能体",
+        "/workflows": "工作流",
+        "/tools": "工具",
+        "/knowledge-bases": "知识库",
+        "/models": "模型",
+        "/evaluation/datasets": "评测数据集",
+      } as Record<string, string>
+    )[page.api] || page.title;
+  const openEditor = (row?: ResourceRecord) => {
+    if (page.api === "/agents") {
+      navigate(`/build/agents/create${row ? `?agent=${row.id}` : ""}`);
+      return;
+    }
+    if (page.api === "/workflows") {
+      navigate(`/build/workflows/designer${row ? `?workflow=${row.id}` : ""}`);
+      return;
+    }
+    setEditing(row || null);
+    if (page.api === "/knowledge-bases" && can("models:read")) {
+      void api
+        .list("/models", 1, 200)
+        .then((result) =>
+          setModels(result.items.filter((model) => model.enabled)),
+        )
+        .catch((reason) => message.error(reason.message));
+    }
+    form.resetFields();
+    form.setFieldsValue({
+      name: row?.name || "",
+      code: row?.code || "",
+      description: row?.description || "",
+      enabled: row?.enabled ?? true,
+      model_type: row?.model_type || "chat_llm",
+      provider_type: row?.provider_type || "openai_compatible",
+      model_id: row?.model_id || "",
+      base_url: row?.config?.base_url || row?.config?.api_base || "",
+      api_key_env: row?.config?.api_key_env || "",
+      auth_scheme: row?.config?.auth_scheme || "bearer",
+      api_key: "",
+      tool_type: row?.config?.type || "echo",
+      tool_url: row?.config?.url || "",
+      tool_method: row?.config?.method || "GET",
+      tool_template: row?.config?.template || "{value}",
+      tool_operation: row?.config?.operation || "sum",
+      embedding_model_id: row?.config?.embedding_model_id,
+      rerank_model_id: row?.config?.rerank_model_id,
+      embedding_dimensions: row?.config?.embedding_dimensions || 128,
+      configText: JSON.stringify(row?.config || {}, null, 2),
+      specText: JSON.stringify(row?.spec || {}, null, 2),
+    });
+  };
+  const save = async () => {
+    try {
+      const values = await form.validateFields();
+      const config = parseObject(values.configText);
+      if (page.api === "/tools") {
+        config.type = values.tool_type;
+        if (values.tool_type === "http")
+          Object.assign(config, {
+            url: values.tool_url,
+            method: values.tool_method,
+          });
+        if (values.tool_type === "template")
+          config.template = values.tool_template;
+        if (values.tool_type === "calculator")
+          config.operation = values.tool_operation;
+      }
+      if (page.api === "/knowledge-bases")
+        Object.assign(config, {
+          embedding_model_id: values.embedding_model_id,
+          rerank_model_id: values.rerank_model_id || "",
+          embedding_dimensions: values.embedding_dimensions,
+        });
+      if (page.api === "/models") {
+        if (values.base_url) {
+          config.base_url = values.base_url;
+          delete config.api_base;
+        }
+        if (values.api_key_env) config.api_key_env = values.api_key_env;
+        else delete config.api_key_env;
+        config.auth_scheme = values.auth_scheme;
+        if (values.api_key) config.api_key = values.api_key;
+      }
+      const spec = parseObject(values.specText);
+      setSaving(true);
+      const payload: Partial<ResourceRecord> = {
+        name: values.name.trim(),
+        code: values.code?.trim() || "",
+        description: values.description || "",
+        enabled: values.enabled,
+      };
+      if (
+        !editing ||
+        JSON.stringify(config) !== JSON.stringify(editing.config || {})
+      )
+        payload.config = config;
+      if (
+        !editing ||
+        values.specText !== JSON.stringify(editing.spec || {}, null, 2)
+      )
+        payload.spec = spec;
+      if (page.api === "/models")
+        Object.assign(payload, {
+          model_type: values.model_type,
+          provider_type: values.provider_type,
+          model_id: values.model_id,
+        });
+      if (editing) await api.update(page.api, editing.id, payload);
+      else await api.create(page.api, payload);
+      message.success(`${label}已保存`);
+      setEditing(undefined);
+      await load();
+    } catch (reason) {
+      if (reason instanceof Error) message.error(reason.message);
+    } finally {
+      setSaving(false);
     }
   };
-
-  useEffect(() => {
-    void load();
-  }, [page.api]);
-
-  const meta = getPageMeta(page);
-  const activeRows = rows.filter((row) => ['active', 'success', 'published', 'running'].includes(row.status)).length;
-  const enabledRows = rows.filter((row) => row.enabled).length;
-  const guardedRows = rows.filter((row) => row.config || row.spec || row.metadata_json).length;
-
+  const toggle = async (row: ResourceRecord) => {
+    try {
+      await api.update(page.api, row.id, {
+        enabled: !row.enabled,
+        status: row.enabled ? "disabled" : "active",
+      });
+      message.success(row.enabled ? "已停用" : "已启用");
+      await load();
+    } catch (reason) {
+      message.error((reason as Error).message);
+    }
+  };
+  const remove = async (row: ResourceRecord) => {
+    try {
+      await api.remove(page.api, row.id);
+      message.success("已删除");
+      await load();
+    } catch (reason) {
+      message.error((reason as Error).message);
+    }
+  };
+  if (page.designer)
+    return (
+      <div
+        className={`enterprise-page ${page.designer === "workflow" ? "editor-page" : "wizard-page"}`}
+      >
+        <PageHeader
+          title={
+            page.designer === "workflow"
+              ? "工作流编排"
+              : params.get("agent")
+                ? "编辑智能体"
+                : "创建智能体"
+          }
+          description={
+            page.designer === "workflow"
+              ? "连接节点，配置执行参数，再保存并校验流程。"
+              : "按步骤配置模型、提示词和能力。可选配置可以稍后补充。"
+          }
+          actions={
+            <Button
+              icon={<ArrowLeftOutlined />}
+              onClick={() =>
+                navigate(
+                  page.designer === "workflow"
+                    ? "/build/workflows"
+                    : "/build/agents",
+                )
+              }
+            >
+              返回列表
+            </Button>
+          }
+        />
+        <Suspense
+          fallback={<div className="page-loading">正在加载编辑器…</div>}
+        >
+          {page.designer === "workflow" ? (
+            <WorkflowDesigner
+              workflowId={params.get("workflow") || undefined}
+            />
+          ) : (
+            <AgentWizard
+              agentId={params.get("agent") || undefined}
+              onCreated={() => navigate("/build/agents")}
+            />
+          )}
+        </Suspense>
+      </div>
+    );
+  const operations = featureWorkbenchInternals.operationsFor(page);
   const columns: ColumnsType<ResourceRecord> = [
     {
-      title: '资源名称',
-      dataIndex: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (value: string, row) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>{value || row.code || row.id}</Typography.Text>
-          <Typography.Text type="secondary" className="text-xs">{row.description || ''}</Typography.Text>
+      title: `${label}名称`,
+      dataIndex: "name",
+      ellipsis: true,
+      render: (value, row) => (
+        <div className="resource-name-cell">
+          <Button type="link" onClick={() => setDetail(row)}>
+            {value || row.code || row.id}
+          </Button>
+          <Typography.Text type="secondary" ellipsis>
+            {row.description || row.code || "暂无描述"}
+          </Typography.Text>
+        </div>
+      ),
+    },
+    {
+      title: "状态",
+      dataIndex: "status",
+      width: 120,
+      render: (value) => <StatusTag status={value} />,
+    },
+    {
+      title: "启用",
+      dataIndex: "enabled",
+      width: 90,
+      render: (value) => (
+        <span className={`state-label ${value ? "is-enabled" : ""}`}>
+          {value ? "已启用" : "已停用"}
+        </span>
+      ),
+    },
+    {
+      title: "更新时间",
+      dataIndex: "updated_at",
+      width: 175,
+      render: (value) => (
+        <span className="secondary-text">{formatTime(value)}</span>
+      ),
+    },
+    {
+      title: "操作",
+      width: canWrite ? 200 : 80,
+      fixed: "right",
+      render: (_, row) => (
+        <Space size={4}>
+          <Button type="link" onClick={() => setDetail(row)}>
+            详情
+          </Button>
+          {canWrite && (
+            <>
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => openEditor(row)}
+              >
+                编辑
+              </Button>
+              <Dropdown
+                trigger={["click"]}
+                menu={{
+                  items: [
+                    { key: "toggle", label: row.enabled ? "停用" : "启用" },
+                    ...(operations.length
+                      ? [{ key: "operations", label: "运行与操作" }]
+                      : []),
+                  ],
+                  onClick: ({ key }) =>
+                    key === "toggle" ? void toggle(row) : setOperationRow(row),
+                }}
+              >
+                <Button
+                  type="text"
+                  aria-label={`更多操作 ${row.name}`}
+                  icon={<MoreOutlined />}
+                />
+              </Dropdown>
+              <Popconfirm
+                title={`删除${label}？`}
+                description="删除后将从当前列表移除。"
+                onConfirm={() => remove(row)}
+              >
+                <Button
+                  type="text"
+                  danger
+                  aria-label={`删除 ${row.name}`}
+                  icon={<DeleteOutlined />}
+                />
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
     },
-    { title: '编码', dataIndex: 'code', width: 180, render: (value: string) => <Tag>{value || '-'}</Tag> },
-    { title: '状态', dataIndex: 'status', width: 120, render: (value: string) => <Tag color={statusColor(value)}>{value || 'unknown'}</Tag> },
-    { title: '启用', dataIndex: 'enabled', width: 110, render: (value: boolean) => <Tag color={value ? 'success' : 'error'}>{value ? '启用' : '停用'}</Tag> },
-    { title: '更新时间', dataIndex: 'updated_at', width: 190, render: (value: string) => <Typography.Text type="secondary">{value || '-'}</Typography.Text> },
-    {
-      title: '操作',
-      width: 150,
-      render: (_, row) => (
-        <Space>
-          <Button size="small" type="link" onClick={() => void api.action(`${page.api}/${row.id}/enable`, {}).then(() => load())}>启用</Button>
-          <Button size="small" type="link" danger onClick={() => void api.action(`${page.api}/${row.id}/disable`, {}).then(() => load())}>停用</Button>
-        </Space>
-      )
-    }
   ];
-
-  const submit = async (): Promise<void> => {
-    try {
-      const values = await form.submit<Record<string, unknown>>();
-      await api.create(page.api, {
-        name: String(values.name || ''),
-        code: String(values.code || ''),
-        description: String(values.description || ''),
-        model_type: String(values.model_type || ''),
-        provider_type: String(values.provider_type || ''),
-        config: values.configText ? JSON.parse(String(values.configText)) : {},
-        spec: values.specText ? JSON.parse(String(values.specText)) : {}
-      });
-      setOpen(false);
-      form.reset();
-      await load();
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '保存失败');
-    }
-  };
-
   return (
     <div className="enterprise-page resource-page">
-      <section className="resource-hero">
-        <div>
-          <Space wrap size={8}>
-            <Tag color="processing">{meta.domain}</Tag>
-            <Tag>{page.group}</Tag>
-          </Space>
-          <Typography.Title level={1}>{page.title}</Typography.Title>
-          <Typography.Paragraph>{meta.description}</Typography.Paragraph>
-        </div>
-        <Space wrap>
-          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建资源</Button>
-        </Space>
-      </section>
-
-      <Row gutter={[16, 16]} className="resource-kpi-row">
-        {[
-          { label: '资源总数', value: total || rows.length, icon: <DeploymentUnitOutlined />, extra: meta.objective },
-          { label: '活跃资源', value: activeRows, icon: <CloudSyncOutlined />, extra: '可投入运行' },
-          { label: '已启用', value: enabledRows, icon: <SafetyCertificateOutlined />, extra: '策略生效中' },
-          { label: '配置覆盖', value: guardedRows, icon: <ApiOutlined />, extra: meta.owner },
-        ].map((item) => (
-          <Col xs={24} sm={12} xl={6} key={item.label}>
-            <Card className="resource-kpi-card" bordered={false}>
-              <span className="resource-kpi-icon">{item.icon}</span>
-              <div>
-                <Typography.Text type="secondary">{item.label}</Typography.Text>
-                <strong>{item.value}</strong>
-                <small>{item.extra}</small>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Card className="enterprise-card resource-toolbar-card" bordered={false}>
-        <div className="resource-toolbar">
-          <Space wrap>
-            <AntInput.Search
-              prefix={<SearchOutlined />}
-              placeholder="筛选名称、编码、状态"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              onSearch={() => void load()}
-              allowClear
-              className="resource-search"
+      <PageHeader
+        title={page.title}
+        description={
+          descriptions[page.api] || `管理${page.title}，查看详情并维护配置。`
+        }
+        actions={
+          <Space>
+            <Button
+              aria-label="刷新列表"
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={() => void load()}
             />
-            <Button icon={<FilterOutlined />}>高级筛选</Button>
+            {canWrite && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => openEditor()}
+              >{`创建${label}`}</Button>
+            )}
           </Space>
-          <Typography.Text type="secondary">共 {rows.length} 条记录</Typography.Text>
-        </div>
-      </Card>
-
-      {page.designer === 'workflow' ? <WorkflowDesigner onSaved={() => void load()} /> : null}
-      {page.designer === 'agent' ? <AgentWizard onCreated={() => void load()} /> : null}
-      <FeatureWorkbench page={page} rows={rows} onChanged={() => load()} />
+        }
+      />
+      {error && (
+        <Alert
+          className="mb-4"
+          type="error"
+          showIcon
+          message="列表加载失败"
+          description={error}
+          action={<Button onClick={() => void load()}>重试</Button>}
+        />
+      )}
       <Card className="enterprise-card table-card" bordered={false}>
+        <div className="list-toolbar">
+          <Space wrap>
+            <Input.Search
+              aria-label="按名称搜索"
+              placeholder={`搜索${label}名称`}
+              value={keyword}
+              allowClear
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                if (!event.target.value) {
+                  setSearch("");
+                  setPageNo(1);
+                }
+              }}
+              onSearch={(value) => {
+                setSearch(value.trim());
+                setPageNo(1);
+              }}
+              style={{ width: 280, maxWidth: "100%" }}
+            />
+            <Select
+              aria-label="筛选状态"
+              placeholder="全部状态"
+              allowClear
+              value={status || undefined}
+              onChange={(value) => {
+                setStatus(value || "");
+                setPageNo(1);
+              }}
+              style={{ width: 140 }}
+              options={["active", "draft", "published", "disabled"].map(
+                (value) => ({
+                  value,
+                  label: (
+                    {
+                      active: "正常",
+                      draft: "草稿",
+                      published: "已发布",
+                      disabled: "已停用",
+                    } as Record<string, string>
+                  )[value],
+                }),
+              )}
+            />
+          </Space>
+          <span className="secondary-text">共 {total} 项</span>
+        </div>
         <Table<ResourceRecord>
           rowKey="id"
           columns={columns}
           dataSource={rows}
           loading={loading}
-          pagination={{ total, pageSize: 20, onChange: (pageNo) => void load(pageNo) }}
+          scroll={{ x: 760 }}
+          pagination={{
+            current: pageNo,
+            total,
+            pageSize: 20,
+            showSizeChanger: false,
+            onChange: setPageNo,
+            showTotal: (count) => `共 ${count} 项`,
+          }}
+          locale={{
+            emptyText: (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  search || status
+                    ? "没有符合条件的资源，请调整筛选条件"
+                    : `还没有${label}`
+                }
+              >
+                {canWrite && !search && !status && (
+                  <Button
+                    type="primary"
+                    onClick={() => openEditor()}
+                  >{`创建第一个${label}`}</Button>
+                )}
+              </Empty>
+            ),
+          }}
         />
       </Card>
-      <Drawer open={open} title={`新建${page.title}`} width={520} onClose={() => setOpen(false)} extra={<Button type="primary" onClick={() => void submit()}>保存</Button>}>
-        <FormProvider form={form}>
-          <Form layout="vertical">
-            <Field name="name" title="名称" required decorator={[FormItem]} component={[Input]} />
-            <Field name="code" title="编码" decorator={[FormItem]} component={[Input]} />
-            <Field name="description" title="描述" decorator={[FormItem]} component={[Input.TextArea, { rows: 3 }]} />
-            <Field name="model_type" title="模型类型" decorator={[FormItem]} component={[Input]} />
-            <Field name="provider_type" title="供应商类型" decorator={[FormItem]} component={[Input]} />
-            <Field name="configText" title="配置信息" decorator={[FormItem]} component={[Input.TextArea, { rows: 5, placeholder: '请输入 JSON 格式的配置' }]} />
-            <Field name="specText" title="规格信息" decorator={[FormItem]} component={[Input.TextArea, { rows: 5, placeholder: '请输入 JSON 格式的规格' }]} />
-          </Form>
-        </FormProvider>
+      {canWrite && operations.length > 0 && (
+        <Collapse
+          className="advanced-operations"
+          items={[
+            {
+              key: "advanced",
+              label: "高级操作",
+              children: (
+                <FeatureWorkbench
+                  key={page.api}
+                  page={page}
+                  rows={rows}
+                  onChanged={load}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
+      <Drawer
+        open={editing !== undefined}
+        title={`${editing ? "编辑" : "创建"}${label}`}
+        width={560}
+        onClose={() => !saving && setEditing(undefined)}
+        extra={
+          <Button type="primary" loading={saving} onClick={() => void save()}>
+            保存
+          </Button>
+        }
+      >
+        <Form form={form} layout="vertical" preserve>
+          <Form.Item
+            name="name"
+            label="名称"
+            rules={[
+              { required: true, whitespace: true, message: "请输入名称" },
+            ]}
+          >
+            <Input maxLength={120} />
+          </Form.Item>
+          <Form.Item name="description" label="描述">
+            <Input.TextArea rows={3} placeholder="简要说明用途" />
+          </Form.Item>
+          <Form.Item name="code" label="编码">
+            <Input placeholder="留空自动生成" />
+          </Form.Item>
+          <Form.Item name="enabled" label="启用" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          {page.api === "/tools" && (
+            <>
+              <Form.Item
+                name="tool_type"
+                label="工具类型"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={[
+                    { value: "echo", label: "参数回显（调试）" },
+                    { value: "calculator", label: "计算器" },
+                    { value: "template", label: "文本模板" },
+                    { value: "http", label: "HTTP 接口" },
+                  ]}
+                />
+              </Form.Item>
+              {toolType === "calculator" && (
+                <Form.Item name="tool_operation" label="默认运算">
+                  <Select
+                    options={[
+                      { value: "sum", label: "求和" },
+                      { value: "multiply", label: "乘积" },
+                    ]}
+                  />
+                </Form.Item>
+              )}
+              {toolType === "template" && (
+                <Form.Item
+                  name="tool_template"
+                  label="文本模板"
+                  rules={[{ required: true }]}
+                >
+                  <Input.TextArea rows={3} placeholder="例如：你好，{name}" />
+                </Form.Item>
+              )}
+              {toolType === "http" && (
+                <>
+                  <Form.Item
+                    name="tool_url"
+                    label="接口地址"
+                    rules={[
+                      { required: true },
+                      {
+                        type: "url",
+                        message: "请输入完整的 HTTP 或 HTTPS 地址",
+                      },
+                    ]}
+                  >
+                    <Input placeholder="https://example.com/api" />
+                  </Form.Item>
+                  <Form.Item name="tool_method" label="请求方法">
+                    <Select
+                      options={["GET", "POST", "PUT", "PATCH", "DELETE"].map(
+                        (value) => ({ value, label: value }),
+                      )}
+                    />
+                  </Form.Item>
+                </>
+              )}
+            </>
+          )}
+          {page.api === "/knowledge-bases" && (
+            <>
+              <Form.Item
+                name="embedding_model_id"
+                label="向量模型"
+                rules={[{ required: true, message: "请选择向量模型" }]}
+              >
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="选择用于文档与查询的向量模型"
+                  options={models
+                    .filter((model) => model.model_type === "embedding")
+                    .map((model) => ({ value: model.id, label: model.name }))}
+                  onChange={(id) => {
+                    const dimensions = models.find((model) => model.id === id)
+                      ?.config?.embedding_dimensions;
+                    form.setFieldValue(
+                      "embedding_dimensions",
+                      dimensions || undefined,
+                    );
+                  }}
+                />
+              </Form.Item>
+              <Form.Item
+                name="embedding_dimensions"
+                label="向量维度"
+                rules={[
+                  { required: true, message: "请填写模型输出的向量维度" },
+                ]}
+                extra="必须与所选模型的实际输出一致；本地演示模型默认 128。"
+              >
+                <InputNumber min={1} max={65536} />
+              </Form.Item>
+              <Form.Item name="rerank_model_id" label="重排序模型（可选）">
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  options={models
+                    .filter((model) => model.model_type === "rerank")
+                    .map((model) => ({ value: model.id, label: model.name }))}
+                />
+              </Form.Item>
+            </>
+          )}
+          {page.api === "/models" && (
+            <>
+              <Form.Item
+                name="model_type"
+                label="模型类型"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={[
+                    "chat_llm",
+                    "reasoning_llm",
+                    "vision_language",
+                    "embedding",
+                    "rerank",
+                  ].map((value) => ({ value, label: value }))}
+                />
+              </Form.Item>
+              <Form.Item
+                name="provider_type"
+                label="供应商类型"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={[
+                    { value: "openai_compatible", label: "OpenAI 兼容接口" },
+                    { value: "echo_agent_native", label: "本地演示模型" },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                name="model_id"
+                label="模型标识"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="服务端提供的模型名称" />
+              </Form.Item>
+              {providerType !== "echo_agent_native" && (
+                <>
+                  <Form.Item
+                    name="base_url"
+                    label="服务地址"
+                    rules={[
+                      { required: true, message: "请输入服务地址" },
+                      {
+                        type: "url",
+                        message: "请输入完整的 HTTP 或 HTTPS 地址",
+                      },
+                    ]}
+                  >
+                    <Input placeholder="https://example.com/v1" />
+                  </Form.Item>
+                  <Form.Item name="auth_scheme" label="认证方式">
+                    <Select
+                      options={[
+                        { value: "bearer", label: "API 密钥" },
+                        { value: "none", label: "无需认证" },
+                      ]}
+                    />
+                  </Form.Item>
+                  {authScheme !== "none" && (
+                    <>
+                      <Form.Item name="api_key_env" label="密钥环境变量">
+                        <Input placeholder="例如：LLM_API_KEY" />
+                      </Form.Item>
+                      <Form.Item name="api_key" label="或填写 API 密钥">
+                        <Input.Password
+                          autoComplete="new-password"
+                          placeholder={
+                            editing
+                              ? "留空保留原密钥"
+                              : "环境变量与密钥填写一项即可"
+                          }
+                        />
+                      </Form.Item>
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+          <Collapse
+            defaultActiveKey={!editing ? ["config"] : []}
+            items={[
+              {
+                key: "config",
+                label: "高级配置",
+                children: (
+                  <>
+                    <Form.Item name="configText" label="配置 JSON">
+                      <Input.TextArea rows={8} className="code-input" />
+                    </Form.Item>
+                    <Form.Item name="specText" label="规格 JSON">
+                      <Input.TextArea rows={5} className="code-input" />
+                    </Form.Item>
+                  </>
+                ),
+              },
+            ]}
+          />
+        </Form>
+      </Drawer>
+      <Drawer
+        open={!!detail}
+        title={detail?.name || `${label}详情`}
+        width={620}
+        onClose={() => setDetail(null)}
+        extra={
+          canWrite && (
+            <Button
+              onClick={() => {
+                if (detail) openEditor(detail);
+                setDetail(null);
+              }}
+            >
+              编辑
+            </Button>
+          )
+        }
+      >
+        {detail && (
+          <>
+            <Descriptions
+              column={1}
+              bordered
+              size="small"
+              items={[
+                {
+                  key: "description",
+                  label: "描述",
+                  children: detail.description || "暂无描述",
+                },
+                {
+                  key: "status",
+                  label: "状态",
+                  children: <StatusTag status={detail.status} />,
+                },
+                {
+                  key: "id",
+                  label: "资源 ID",
+                  children: (
+                    <Typography.Text copyable>{detail.id}</Typography.Text>
+                  ),
+                },
+                {
+                  key: "updated",
+                  label: "更新时间",
+                  children: formatTime(detail.updated_at),
+                },
+              ]}
+            />
+            {canWrite && operations.length > 0 && (
+              <div className="mt-4">
+                <FeatureWorkbench
+                  page={page}
+                  rows={[detail]}
+                  onChanged={load}
+                />
+              </div>
+            )}
+            <Collapse
+              className="mt-4"
+              items={[
+                {
+                  key: "config",
+                  label: "查看完整配置",
+                  children: (
+                    <pre className="json-view">
+                      {JSON.stringify(
+                        { config: detail.config, spec: detail.spec },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  ),
+                },
+              ]}
+            />
+          </>
+        )}
+      </Drawer>
+      <Drawer
+        open={!!operationRow}
+        title={`${operationRow?.name} · 运行与操作`}
+        width={620}
+        onClose={() => setOperationRow(null)}
+      >
+        {operationRow && (
+          <FeatureWorkbench
+            key={operationRow.id}
+            page={page}
+            rows={[operationRow]}
+            onChanged={load}
+          />
+        )}
       </Drawer>
     </div>
   );
