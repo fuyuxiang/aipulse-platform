@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,10 +13,10 @@ def run(command: list[str], cwd: Path) -> None:
 
 
 def main() -> None:
-    run(["ruff", "check", "."], ROOT / "backend")
-    run(["mypy", "app"], ROOT / "backend")
-    run(["pytest"], ROOT / "backend")
-    run(["pytest"], ROOT / "runtime")
+    run([sys.executable, "-m", "ruff", "check", "backend", "runtime", "scripts"], ROOT)
+    run([sys.executable, "-m", "mypy", "app"], ROOT / "backend")
+    run([sys.executable, "-m", "pytest"], ROOT / "backend")
+    run([sys.executable, "-m", "pytest"], ROOT / "runtime")
     run(["npm", "run", "lint"], ROOT / "frontend")
     run(["npm", "run", "test"], ROOT / "frontend")
     run(["npm", "run", "build"], ROOT / "frontend")

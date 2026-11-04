@@ -8,6 +8,7 @@ const port = 3100;
 const apiPort = 8107;
 const root = path.resolve("..");
 const data = mkdtempSync(path.join(tmpdir(), "aipulse-browser-e2e-"));
+const output = process.env.AIPULSE_E2E_OUTPUT_DIR || path.join(data, "browser-results");
 const env = {
   ...process.env,
   PYTHONPATH: path.join(root, "backend"),
@@ -64,7 +65,7 @@ function waitForServer(url) {
     tick();
   });
 }
-console.log("Isolated browser evidence:", path.join(data, "browser-results"));
+console.log("Isolated browser evidence:", output);
 const shutdown = () => {
   server.kill("SIGTERM");
   backend.kill("SIGTERM");
@@ -89,7 +90,7 @@ try {
       {
         env: {
           ...env,
-          AIPULSE_E2E_OUTPUT_DIR: path.join(data, "browser-results"),
+          AIPULSE_E2E_OUTPUT_DIR: output,
         },
         stdio: "inherit",
         shell: false,

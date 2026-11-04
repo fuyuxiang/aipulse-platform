@@ -1,0 +1,185 @@
+name: AIPulse CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aipulse-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  AIPULSE_SCHEDULER_ENABLED: "false"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            backend/pyproject.toml
+            echo-agent/pyproject.toml
+      - name: Install platform and engine dependencies
+        run: python -m pip install -r requirements-ci.txt -e ./echo-agent -e ./backend
+      - name: Lint platform Python code
+        run: python -m ruff check backend runtime scripts
+      - name: Check backend types
+        working-directory: backend
+        run: python -m mypy app
+      - name: Test backend
+        working-directory: backend
+        run: python -m pytest -q --junitxml="${RUNNER_TEMP}/backend-results.xml"
+      - name: Test Runtime and engine integration
+        working-directory: runtime
+        run: python -m pytest -q --junitxml="${RUNNER_TEMP}/runtime-results.xml"
+      - name: Verify fresh database migration and initialization
+        working-directory: backend
+        env:
+          AIPULSE_DATABASE_URL: sqlite:///${{ runner.temp }}/aipulse-migrations/aipulse.db
+          AIPULSE_DATA_DIR: ${{ runner.temp }}/aipulse-migrations/data
+          AIPULSE_OBJECT_STORE_DIR: ${{ runner.temp }}/aipulse-migrations/files
+          AIPULSE_VECTOR_STORE_DIR: ${{ runner.temp }}/aipulse-migrations/vectors
+          AIPULSE_LOG_PATH: ${{ runner.temp }}/aipulse-migrations/logs/backend.jsonl
+          AIPULSE_TRACE_PATH: ${{ runner.temp }}/aipulse-migrations/traces/backend.jsonl
+        run: |
+          mkdir -p "${RUNNER_TEMP}/aipulse-migrations"
+          python -m alembic upgrade head
+          python ../scripts/init_db.py
+          python -m alembic current
+      - name: Upload Python test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: python-${{ matrix.python-version }}-reports
+          path: |
+            ${{ runner.temp }}/backend-results.xml
+            ${{ runner.temp }}/runtime-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend:
+    name: Frontend checks and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Check TypeScript
+        run: npm run lint
+      - name: Run unit tests
+        run: npm run test
+      - name: Build frontend
+        run: npm run build
+      - name: Upload frontend distribution
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: aipulse-frontend
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    name: Browser business tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            backend/pyproject.toml
+            echo-agent/pyproject.toml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install platform and engine dependencies
+        run: python -m pip install -r requirements-ci.txt -e ./echo-agent -e ./backend
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium and Linux dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run isolated browser tests
+        working-directory: frontend
+        env:
+          AIPULSE_E2E_OUTPUT_DIR: ${{ runner.temp }}/aipulse-e2e-results
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ runner.temp }}/aipulse-e2e-report
+        run: npm run e2e -- --reporter=line,html
+      - name: Upload browser reports and failure traces
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: browser-test-reports
+          path: |
+            ${{ runner.temp }}/aipulse-e2e-results/
+            ${{ runner.temp }}/aipulse-e2e-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  quality-gate:
+    name: CI passed
+    if: always()
+    needs: [python, frontend, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    env:
+      PYTHON_RESULT: ${{ needs.python.result }}
+      FRONTEND_RESULT: ${{ needs.frontend.result }}
+      E2E_RESULT: ${{ needs.e2e.result }}
+    steps:
+      - name: Require every check to pass
+        run: |
+          for result in "$PYTHON_RESULT" "$FRONTEND_RESULT" "$E2E_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "At least one CI job failed, was cancelled, or was skipped."
+              exit 1
+            fi
+          done

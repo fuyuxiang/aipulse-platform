@@ -12,7 +12,7 @@ import os
 import tempfile
 from pathlib import Path
 
-root = Path(tempfile.mkdtemp(prefix='aipulse-real-review-', dir='/private/tmp'))
+root = Path(tempfile.mkdtemp(prefix='aipulse-real-review-'))
 for name, sub in [('DATA_DIR', 'data'), ('OBJECT_STORE_DIR', 'files'), ('VECTOR_STORE_DIR', 'vectors'), ('LOG_PATH', 'backend.jsonl'), ('TRACE_PATH', 'traces.jsonl')]:
     os.environ['AIPULSE_' + name] = str(root / sub)
 os.environ['AIPULSE_DATABASE_URL'] = f'sqlite:///{root / "smoke.db"}'

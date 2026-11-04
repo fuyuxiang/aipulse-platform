@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from sqlalchemy.orm import Session
 from sqlalchemy import update
+from sqlalchemy.engine import CursorResult
 
 from app.core.constants import ErrorCode
 from app.core.errors import AppError
@@ -74,9 +75,9 @@ class ToolService:
                 or datetime.fromisoformat(expires_at).replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)):
             raise AppError(ErrorCode.FORBIDDEN, "approval is invalid, expired, consumed, or does not match this request", 403)
         model: Any = RESOURCE_MODELS["tool_approval_tasks"]
-        result = self.resources.db.execute(update(model).where(
+        result = cast(CursorResult[Any], self.resources.db.execute(update(model).where(
             model.id == approval.id, model.tenant_id == tenant_id, model.status == "approved"
-        ).values(status="consumed"))
+        ).values(status="consumed")))
         self.resources.db.commit()
         if result.rowcount != 1:
             raise AppError(ErrorCode.FORBIDDEN, "approval already consumed", 403)

@@ -1,5 +1,52 @@
 # 测试
 
+## GitHub Actions
+
+平台工作流为 [ci.yml](../.github/workflows/ci.yml) 和 [publish.yml](../.github/workflows/publish.yml)。原有 RAGFlow 测试、定时发布、自建 `ragflow-test` Runner、Docker Hub / PyPI 发布配置已移除。
+
+### 触发与检查
+
+CI 在 `main` 推送、目标为 `main` 的 PR，以及 Actions 页手动运行时触发。PR 不需要额外标签，新建和重新打开 PR 也会运行；文档提交同样获得完整检查结果。新提交会取消同一分支或 PR 的旧 CI。
+
+| 作业 | 检查内容 |
+| --- | --- |
+| `Python 3.11` / `Python 3.12` | 安装平台与 Echo Agent 基础依赖；检查 `backend/`、`runtime/`、`scripts/` 的 Ruff，执行后端 mypy、两套 pytest，以及新建 SQLite 的 Alembic 迁移和默认数据初始化。 |
+| `Frontend checks and build` | 使用 Node.js 22 和 `npm ci`，执行高危级别依赖审计、类型检查、单元测试与生产构建。 |
+| `Browser business tests` | 安装 Chromium 与 Linux 系统依赖，通过 `npm run e2e` 启动临时数据环境并运行完整浏览器回归。 |
+| `CI passed` | 检查上述作业均为成功；失败、取消或跳过不能获得通过结果。 |
+
+Python 工具链固定在 [requirements-ci.txt](../requirements-ci.txt)；应用依赖仍由后端与引擎的 `pyproject.toml` 声明。官方 Actions 固定到提交 SHA，运行于 GitHub 托管的 Ubuntu 24.04，无需旧项目 Runner、Docker、真实模型密钥或第三方发布凭证。
+
+在 Actions 的对应运行中可下载以下产物，保留 7 天：
+
+- `python-3.11-reports`、`python-3.12-reports`：后端和 Runtime 的 JUnit XML。
+- `aipulse-frontend`：构建后的前端静态资源。
+- `browser-test-reports`：Playwright HTML 报告、测试截图及失败 Trace。浏览器测试仅使用隔离的合成数据，不上传业务数据库。
+
+`AIPULSE_E2E_OUTPUT_DIR` 可指定浏览器测试输出目录；默认仍为脚本打印的临时目录。CI 禁止意外提交的 `test.only`。测试临时目录使用操作系统标准目录，可在 macOS 和 Linux 中运行。
+
+分支保护如需阻止未通过检查的合并，可将 `CI passed` 设为 required check；分支保护设置独立于工作流文件，不由脚本自动修改。
+
+### 发布验证
+
+发布标签采用 `vMAJOR.MINOR.PATCH` 或 `vMAJOR.MINOR.PATCH-rc.1` 等格式。标签触发 `publish.yml`，先调用同一份 CI；全部通过后打包源码、下载已验证的前端构建并生成 `SHA256SUMS`，上传至该标签的 GitHub Release。预发布标签生成 prerelease，工作流不再定时移动 `nightly` 标签，也不发布 RAGFlow 镜像或 SDK。
+
+默认作业只有 `contents: read`；仅最后的 Release 作业具有 `contents: write`。推送 `main` 不会创建 Release，也不会部署业务环境。
+
+若 GitHub 上曾有因长期无活动停用的历史工作流，应以新工作流的运行结果为准。工作流启停可在 Actions 页管理，具体方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)。工作流通过、分支保护启用和生产部署是不同状态，不能相互替代。
+
+## 本地检查
+
+在仓库根目录安装并使用相同的工具链：
+
+```bash
+python -m pip install -r requirements-ci.txt -e ./echo-agent -e ./backend
+npm --prefix frontend ci
+python scripts/check_all.py
+```
+
+`check_all.py` 包含 Python 静态检查、后端和 Runtime 测试、前端类型检查、单元测试及构建。浏览器测试另行执行，命令如下。
+
 后端：
 
 ```bash

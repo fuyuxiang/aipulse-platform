@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Annotated, Any
 
@@ -87,7 +88,7 @@ def _authenticate_publication(db: Session, agent_id: str, api_key: str, permissi
         raise AppError(ErrorCode.UNAUTHORIZED, "missing X-API-Key", 401)
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     key_model: Any = RESOURCE_MODELS["agent_api_keys"]
-    rows = db.scalars(
+    rows: Sequence[Any] = db.scalars(
         select(key_model).where(
             key_model.agent_id == agent_id,
             key_model.status == "active",

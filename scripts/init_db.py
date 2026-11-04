@@ -8,9 +8,9 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.db.base import Base
-from app.db.init_data import initialize_defaults
-from app.db.session import SessionLocal, engine
+from app.db.base import Base  # noqa: E402
+from app.db.init_data import initialize_defaults  # noqa: E402
+from app.db.session import SessionLocal, engine  # noqa: E402
 
 
 def main() -> None:

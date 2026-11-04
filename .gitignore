@@ -3,6 +3,7 @@
 debug/
 target/
 __pycache__/
+*.egg-info/
 hudet/
 cv/
 layout_app.py

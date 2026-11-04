@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from datetime import datetime, timezone
 from typing import Any
 
@@ -125,7 +125,7 @@ class ChatService:
         self.require_session(tenant_id, user_id, session_id)
         model: Any = RESOURCE_MODELS["chat_messages"]
         criteria = (model.tenant_id == tenant_id, model.session_id == session_id, model.deleted_at.is_(None))
-        rows = list(self.db.scalars(select(model).where(*criteria).order_by(model.created_at.desc(), model.id.desc()).offset((page - 1) * page_size).limit(page_size)))
+        rows: list[Any] = list(self.db.scalars(select(model).where(*criteria).order_by(model.created_at.desc(), model.id.desc()).offset((page - 1) * page_size).limit(page_size)))
         total = int(self.db.scalar(select(func.count()).select_from(model).where(*criteria)) or 0)
         return [ResourceService.to_dict(row) for row in reversed(rows)], total
 
@@ -167,7 +167,7 @@ class ChatService:
         parent = self.resources.get("chat_messages", tenant_id, msg.parent_id) if msg.parent_id else None
         if parent is None:
             model: Any = RESOURCE_MODELS["chat_messages"]
-            rows = self.db.scalars(select(model).where(model.tenant_id == tenant_id, model.session_id == session_id,
+            rows: Sequence[Any] = self.db.scalars(select(model).where(model.tenant_id == tenant_id, model.session_id == session_id,
                 model.created_at <= msg.created_at, model.id != msg.id, model.deleted_at.is_(None)).order_by(model.created_at.desc())).all()
             parent = next((r for r in rows if (r.spec or {}).get("role") == "user"), None)
         if parent is None or parent.session_id != session_id:
@@ -186,7 +186,7 @@ class ChatService:
             parent = self.resources.get("chat_messages", tenant_id, str(payload["_parent_id"]))
             # Only the history before the original request belongs in a regeneration.
             model: Any = RESOURCE_MODELS["chat_messages"]
-            rows = self.db.scalars(select(model).where(model.tenant_id == tenant_id, model.session_id == session_id,
+            rows: Sequence[Any] = self.db.scalars(select(model).where(model.tenant_id == tenant_id, model.session_id == session_id,
                 model.created_at < parent.created_at, model.status == "sent", model.deleted_at.is_(None)).order_by(model.created_at.desc()).limit(int(spec.get("context_window") or 20))).all()
             context = [{"role": r.spec.get("role", "user"), "content": r.spec.get("content", "")} for r in reversed(rows)]
         else:
