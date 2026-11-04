@@ -1,366 +1,351 @@
 import {
-  ApiOutlined,
   ApartmentOutlined,
-  BarChartOutlined,
-  CheckCircleOutlined,
-  CloudServerOutlined,
-  ControlOutlined,
-  DeploymentUnitOutlined,
-  DollarOutlined,
-  FieldTimeOutlined,
-  NodeIndexOutlined,
-  SafetyCertificateOutlined,
-  ThunderboltOutlined,
-  ToolOutlined,
-} from '@ant-design/icons';
-import { Alert, Badge, Card, Col, Empty, Row, Space, Statistic, Table, Tag, Typography } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import React, { useEffect, useMemo, useState } from 'react';
-import { api } from '../../services/http';
+  ArrowRightOutlined,
+  MessageOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  RobotOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Empty,
+  List,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Typography,
+} from "antd";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAccess } from "../../access/context";
+import type { ResourceRecord } from "../../models/types";
+import { api } from "../../services/http";
+import { formatTime, PageHeader, StatusTag } from "../../components/PageHeader";
 
-interface DashboardResponse {
-  summary?: Record<string, number>;
+interface Recent extends ResourceRecord {
+  kind: string;
+  path: string;
 }
-
-interface HealthResponse {
-  status?: string;
-}
-
-interface RuntimeStatusResponse {
-  total?: number;
-}
-
-interface AssetRow {
-  key: string;
-  name: string;
-  source: string;
-  count: number;
-  status: '正常' | '未接入';
-}
-
-interface RuntimeSignal {
-  name: string;
-  status: 'success' | 'processing' | 'warning' | 'default' | 'error';
-  value: string;
-}
-
-const SUMMARY_LABELS: Record<string, string> = {
-  agents: '智能体',
-  agent_runs: '运行记录',
-  workflow_runs: '工作流执行',
-  model_calls: '模型调用',
-  tool_calls: '工具调用',
-  rag_retrievals: '知识检索',
-  alerts: '告警事件',
-  bad_cases: '质量缺陷',
-};
-
-const ASSET_SOURCES: Array<[keyof typeof SUMMARY_LABELS, string]> = [
-  ['agents', 'agents'],
-  ['agent_runs', 'agent_run_records'],
-  ['workflow_runs', 'workflow_runs'],
-  ['model_calls', 'model_call_logs'],
-  ['tool_calls', 'tool_call_logs'],
-  ['rag_retrievals', 'knowledge_retrieval_logs'],
-  ['alerts', 'alert_events'],
-  ['bad_cases', 'bad_cases'],
-];
-
-const assetColumns: ColumnsType<AssetRow> = [
-  {
-    title: '数据类别',
-    dataIndex: 'name',
-    render: (value: string) => (
-      <Typography.Text strong>{value}</Typography.Text>
-    ),
-  },
-  { title: '记录数', dataIndex: 'count', width: 140, render: (value: number) => <Typography.Text strong>{value}</Typography.Text> },
-  { title: '状态', dataIndex: 'status', width: 140, render: (value: string) => <Tag color={value === '正常' ? 'success' : 'default'}>{value}</Tag> },
-];
-
-function metricValue(summary: Record<string, number>, key: string): number {
-  const value = summary[key];
-  return Number.isFinite(value) ? value : 0;
-}
-
-function formatSummaryLabel(key: string): string {
-  return SUMMARY_LABELS[key] || key;
-}
-
 export function DashboardPage(): JSX.Element {
-  const [summary, setSummary] = useState<Record<string, number>>({});
-  const [healthStatus, setHealthStatus] = useState('');
-  const [runtimeTotal, setRuntimeTotal] = useState<number | null>(null);
-  const [dashboardConnected, setDashboardConnected] = useState(false);
-  const [error, setError] = useState('');
-  const tenantName = localStorage.getItem('aipulse_tenant') || '当前租户';
-
-  useEffect(() => {
-    let mounted = true;
-    const load = async (): Promise<void> => {
-      setError('');
-      const [dashboardResult, healthResult, runtimeResult] = await Promise.allSettled([
-        api.get<DashboardResponse>('/observability/dashboard'),
-        api.get<HealthResponse>('/observability/health'),
-        api.get<RuntimeStatusResponse>('/observability/runtime-status'),
-      ]);
-
-      if (!mounted) return;
-
-      if (dashboardResult.status === 'fulfilled') {
-        setSummary(dashboardResult.value.summary || {});
-        setDashboardConnected(true);
-      } else {
-        setSummary({});
-        setDashboardConnected(false);
-        setError(dashboardResult.reason instanceof Error ? dashboardResult.reason.message : '观测数据加载失败');
-      }
-
-      if (healthResult.status === 'fulfilled') {
-        setHealthStatus(healthResult.value.status || '');
-      } else {
-        setHealthStatus('');
-      }
-
-      if (runtimeResult.status === 'fulfilled') {
-        setRuntimeTotal(Number(runtimeResult.value.total || 0));
-      } else {
-        setRuntimeTotal(null);
-      }
-    };
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const metricCards = [
-    {
-      key: 'agents',
-      title: '智能体',
-      description: '已注册智能体总数',
-      icon: <DeploymentUnitOutlined />,
-      tone: 'blue',
-    },
-    {
-      key: 'agent_runs',
-      title: '运行记录',
-      description: '智能体执行次数',
-      icon: <NodeIndexOutlined />,
-      tone: 'green',
-    },
-    {
-      key: 'workflow_runs',
-      title: '工作流执行',
-      description: '工作流运行次数',
-      icon: <BarChartOutlined />,
-      tone: 'amber',
-    },
-    {
-      key: 'alerts',
-      title: '告警事件',
-      description: '待处理告警数',
-      icon: <SafetyCertificateOutlined />,
-      tone: 'red',
-    },
-  ];
-
-  const assetRows = useMemo<AssetRow[]>(
-    () =>
-      ASSET_SOURCES.map(([key, source]) => ({
-        key,
-        name: formatSummaryLabel(key),
-        source,
-        count: metricValue(summary, key),
-        status: dashboardConnected ? '正常' : '未接入',
-      })),
-    [dashboardConnected, summary],
+  const { user, can } = useAccess();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [recent, setRecent] = useState<Recent[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [errors, setErrors] = useState<string[]>([]);
+  const [health, setHealth] = useState<"success" | "error" | "default">(
+    "default",
   );
-
-  const runtimeSignals: RuntimeSignal[] = [
+  const [refreshed, setRefreshed] = useState("");
+  const load = async () => {
+    setLoading(true);
+    setErrors([]);
+    const sources = [
+      {
+        key: "agents",
+        api: "/agents",
+        kind: "智能体",
+        path: "/build/agents",
+        permission: "agents:read",
+      },
+      {
+        key: "workflows",
+        api: "/workflows",
+        kind: "工作流",
+        path: "/build/workflows",
+        permission: "workflows:read",
+      },
+      {
+        key: "teams",
+        api: "/agent-teams",
+        kind: "团队",
+        path: "/playground/multi",
+        permission: "agents:read",
+      },
+      {
+        key: "sessions",
+        api: "/chat/sessions",
+        kind: "对话",
+        path: "/playground",
+        permission: "chat:read",
+      },
+    ].filter((source) => can(source.permission));
+    const items: Recent[] = [];
+    const metrics: Record<string, number> = {};
+    const failures: string[] = [];
+    const results = await Promise.allSettled(
+      sources.map((source) => api.list(source.api, 1, 5)),
+    );
+    results.forEach((result, index) => {
+      const source = sources[index];
+      if (result.status === "fulfilled") {
+        metrics[source.key] = result.value.total;
+        items.push(
+          ...result.value.items.map((row) => ({
+            ...row,
+            kind: source.kind,
+            path: source.path,
+          })),
+        );
+      } else failures.push(`${source.kind}：${result.reason.message}`);
+    });
+    setRecent(
+      items
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, 7),
+    );
+    setCounts(metrics);
+    setErrors(failures);
+    try {
+      const response = await fetch("/health");
+      const data = await response.json();
+      setHealth(response.ok && data.status === "healthy" ? "success" : "error");
+    } catch {
+      setHealth("error");
+    }
+    setRefreshed(new Date().toLocaleTimeString("zh-CN", { hour12: false }));
+    setLoading(false);
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+  const entries = [
     {
-      name: '服务健康状态',
-      status: healthStatus === 'healthy' ? 'success' : healthStatus ? 'warning' : 'default',
-      value: healthStatus === 'healthy' ? '正常' : healthStatus || '检测中',
+      title: "开始对话",
+      description: "选择智能体，处理当前工作",
+      icon: <MessageOutlined />,
+      path: "/playground",
+      permission: "chat:read",
     },
     {
-      name: '运行实例',
-      status: runtimeTotal === null ? 'default' : runtimeTotal > 0 ? 'processing' : 'warning',
-      value: runtimeTotal === null ? '检测中' : `${runtimeTotal} 个`,
+      title: "构建智能体",
+      description: "配置模型、提示词和工具",
+      icon: <RobotOutlined />,
+      path: "/build/agents/create",
+      permission: "agents:write",
     },
     {
-      name: '可观测性',
-      status: dashboardConnected ? 'success' : 'error',
-      value: dashboardConnected ? '已连接' : '未连接',
+      title: "编排工作流",
+      description: "将多个步骤连接成业务流程",
+      icon: <ApartmentOutlined />,
+      path: "/build/workflows/designer",
+      permission: "workflows:write",
     },
-  ];
-
-  const liveMetricItems = Object.entries(summary);
-  const alertCount = metricValue(summary, 'alerts');
-  const badCaseCount = metricValue(summary, 'bad_cases');
-
+    {
+      title: "团队协作",
+      description: "组织多个智能体共同执行任务",
+      icon: <TeamOutlined />,
+      path: "/playground/multi",
+      permission: "agents:read",
+    },
+  ].filter((entry) => can(entry.permission));
+  const metrics = [
+    { key: "agents", label: "智能体", path: "/build/agents" },
+    { key: "workflows", label: "工作流", path: "/build/workflows" },
+    { key: "teams", label: "协作团队", path: "/playground/multi" },
+    { key: "sessions", label: "我的对话", path: "/playground" },
+  ].filter(
+    (metric) =>
+      ({
+        agents: can("agents:read"),
+        workflows: can("workflows:read"),
+        teams: can("agents:read"),
+        sessions: can("chat:read"),
+      })[metric.key],
+  );
   return (
-    <div className="enterprise-page dashboard-page">
-      <section className="dashboard-hero">
-        <div>
-          <Space size={8} wrap>
-            <Tag color="processing">AIPulse AgentOS</Tag>
-            <Tag color={dashboardConnected ? 'success' : 'error'}>{dashboardConnected ? '系统运行正常' : '系统未连接'}</Tag>
-          </Space>
-          <Typography.Title level={1}>运行指挥中心</Typography.Title>
-        </div>
-        <div className="hero-control-panel">
-          <div className="hero-control-title">
-            <CloudServerOutlined />
-            <span>系统信息</span>
-          </div>
-          <div className="hero-control-grid">
-            <span>租户</span>
-            <strong>{tenantName}</strong>
-            <span>环境</span>
-            <strong>生产环境</strong>
-            <span>版本</span>
-            <strong>v1.0</strong>
-          </div>
-        </div>
-      </section>
-
-      {error ? <Alert className="mb-4" type="error" showIcon message="数据加载失败" description={error} /> : null}
-
-      <Row gutter={[16, 16]} className="metric-row">
-        {metricCards.map((item) => (
-          <Col xs={24} sm={12} xl={6} key={item.key}>
-            <Card className={`metric-card metric-card-${item.tone}`} bordered={false}>
-              <div className="metric-card-top">
-                <span className="metric-icon">{item.icon}</span>
-                <Tag bordered={false}>{item.description}</Tag>
-              </div>
-              <Statistic title={item.title} value={metricValue(summary, item.key)} />
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={16}>
-          <Card
-            className="enterprise-card"
-            title={
-              <Space>
-                <ControlOutlined />
-                <span>平台能力概览</span>
-              </Space>
-            }
+    <div className="enterprise-page workspace-page">
+      <PageHeader
+        title="工作台"
+        description={`欢迎回来，${user?.display_name || user?.username}。从最近的工作继续，或开始一个新任务。`}
+        actions={
+          <Button
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => void load()}
           >
-            <div className="lifecycle-strip">
-              {[
-                { title: '开发', text: '智能体、工作流、提示词', icon: <ApartmentOutlined /> },
-                { title: '发布', text: '版本管理、灰度发布', icon: <ThunderboltOutlined /> },
-                { title: '运行', text: '对话、调度、多智能体协同', icon: <ApiOutlined /> },
-                { title: '治理', text: '安全护栏、审计、成本管控', icon: <SafetyCertificateOutlined /> },
-              ].map((item, index) => (
-                <div className="lifecycle-step" key={item.title}>
-                  <span className="lifecycle-index">{index + 1}</span>
-                  <span className="lifecycle-icon">{item.icon}</span>
-                  <strong>{item.title}</strong>
-                  <small>{item.text}</small>
-                </div>
-              ))}
-            </div>
-            <Table<AssetRow>
-              className="mt-4"
-              rowKey="key"
-              size="middle"
-              columns={assetColumns}
-              dataSource={assetRows}
-              pagination={false}
+            刷新
+          </Button>
+        }
+      />
+      {errors.length > 0 && (
+        <Alert
+          className="mb-4"
+          type="warning"
+          showIcon
+          message="部分数据未能加载"
+          description={errors.join("；")}
+          action={<Button onClick={() => void load()}>重试</Button>}
+        />
+      )}
+      <div className="workspace-entries">
+        {entries.map((entry) => (
+          <button
+            className="workspace-entry"
+            key={entry.path}
+            onClick={() => navigate(entry.path)}
+          >
+            <span className="workspace-entry-icon">{entry.icon}</span>
+            <span>
+              <strong>{entry.title}</strong>
+              <small>{entry.description}</small>
+            </span>
+            <ArrowRightOutlined />
+          </button>
+        ))}
+      </div>
+      {!!metrics.length && (
+        <div className="workspace-metrics">
+          {metrics.map((metric) => (
+            <Card key={metric.key} className="enterprise-card" size="small">
+              <Statistic
+                title={metric.label}
+                value={counts[metric.key] ?? "—"}
+                loading={loading}
+              />
+              <Link to={metric.path}>
+                查看全部 <ArrowRightOutlined />
+              </Link>
+            </Card>
+          ))}
+        </div>
+      )}
+      <div className="workspace-columns">
+        <Card
+          className="enterprise-card"
+          title="最近创建"
+          extra={<span className="secondary-text">当前账号可访问的资源</span>}
+        >
+          <Table<Recent>
+            rowKey={(row) => `${row.kind}-${row.id}`}
+            size="middle"
+            loading={loading}
+            dataSource={recent}
+            pagination={false}
+            scroll={{ x: 480 }}
+            columns={[
+              {
+                title: "名称",
+                dataIndex: "name",
+                render: (value, row) => (
+                  <Button type="link" onClick={() => navigate(row.path)}>
+                    {value || "未命名"}
+                  </Button>
+                ),
+              },
+              { title: "类型", dataIndex: "kind", width: 80 },
+              {
+                title: "状态",
+                width: 110,
+                render: (_, row) => <StatusTag status={row.status} />,
+              },
+              {
+                title: "创建时间",
+                width: 170,
+                render: (_, row) => (
+                  <span className="secondary-text">
+                    {formatTime(row.created_at)}
+                  </span>
+                ),
+              },
+            ]}
+            locale={{
+              emptyText: (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="还没有工作记录"
+                >
+                  {can("agents:write") ? (
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => navigate("/build/agents/create")}
+                    >
+                      创建第一个智能体
+                    </Button>
+                  ) : (
+                    <Typography.Text type="secondary">
+                      联系管理员配置智能体与访问权限。
+                    </Typography.Text>
+                  )}
+                </Empty>
+              ),
+            }}
+          />
+        </Card>
+        <div className="workspace-side">
+          <Card className="enterprise-card" title="开始使用">
+            <List
+              size="small"
+              dataSource={[
+                ...(can("models:write")
+                  ? [
+                      {
+                        title: "接入与验证模型",
+                        path: "/settings/models",
+                        text: "配置真实服务，或使用本地演示模型",
+                      },
+                    ]
+                  : []),
+                ...(can("agents:write")
+                  ? [
+                      {
+                        title: "配置智能体",
+                        path: "/build/agents/create",
+                        text: "选择模型，描述角色与行为",
+                      },
+                    ]
+                  : []),
+                ...(can("chat:read")
+                  ? [
+                      {
+                        title: "开始一次对话",
+                        path: "/playground",
+                        text: "验证回答，并保留对话记录",
+                      },
+                    ]
+                  : []),
+              ]}
+              renderItem={(item, index) => (
+                <List.Item>
+                  <Link className="getting-started-item" to={item.path}>
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <small>{item.text}</small>
+                    </div>
+                    <ArrowRightOutlined />
+                  </Link>
+                </List.Item>
+              )}
+              locale={{ emptyText: "暂无可用入口，请联系管理员分配权限。" }}
             />
           </Card>
-        </Col>
-
-        <Col xs={24} xl={8}>
-          <Card
-            className="enterprise-card runtime-card"
-            title={
-              <Space>
-                <FieldTimeOutlined />
-                <span>运行连接状态</span>
-              </Space>
-            }
-            extra={<Badge status={dashboardConnected ? 'success' : 'error'} text={dashboardConnected ? 'Connected' : 'Disconnected'} />}
-          >
-            <Space direction="vertical" size={14} className="w-full">
-              {runtimeSignals.map((signal) => (
-                <div className="runtime-signal" key={signal.name}>
-                  <Badge status={signal.status} text={signal.name} />
-                  <Typography.Text strong>{signal.value}</Typography.Text>
-                </div>
-              ))}
-            </Space>
+          <Card className="enterprise-card" size="small">
+            <div className="workspace-status">
+              <Badge
+                status={health}
+                text={
+                  health === "success"
+                    ? "平台服务正常"
+                    : health === "error"
+                      ? "服务状态异常"
+                      : "检测中"
+                }
+              />
+              <span className="secondary-text">本地开发版</span>
+            </div>
+            <div className="secondary-text mt-3">
+              {refreshed ? `最近刷新 ${refreshed}` : <Spin size="small" />}
+            </div>
           </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]} className="mt-4">
-        <Col xs={24} xl={15}>
-          <Card
-            className="enterprise-card"
-            title={
-              <Space>
-                <CheckCircleOutlined />
-                <span>生产风险入口</span>
-              </Space>
-            }
-          >
-            <Row gutter={[12, 12]}>
-              <Col xs={24} md={12}>
-                <div className="production-risk-card">
-                  <SafetyCertificateOutlined />
-                  <Typography.Text type="secondary">告警事件</Typography.Text>
-                  <strong>{alertCount}</strong>
-                </div>
-              </Col>
-              <Col xs={24} md={12}>
-                <div className="production-risk-card">
-                  <ToolOutlined />
-                  <Typography.Text type="secondary">质量缺陷</Typography.Text>
-                  <strong>{badCaseCount}</strong>
-                </div>
-              </Col>
-            </Row>
-            {alertCount === 0 && badCaseCount === 0 ? (
-              <Empty className="mt-4" image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前无告警或质量缺陷，系统运行正常" />
-            ) : null}
-          </Card>
-        </Col>
-        <Col xs={24} xl={9}>
-          <Card
-            className="enterprise-card live-summary-card"
-            title={
-              <Space>
-                <DollarOutlined />
-                <span>实时指标透视</span>
-              </Space>
-            }
-          >
-            {liveMetricItems.length > 0 ? (
-              <div className="live-summary-grid">
-                {liveMetricItems.map(([key, value]) => (
-                  <div key={key}>
-                    <span>{formatSummaryLabel(key)}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-live-summary">
-                <Typography.Text strong>暂无运行数据</Typography.Text>
-                <Typography.Text type="secondary">系统启动后将自动采集运行指标数据。</Typography.Text>
-              </div>
-            )}
-          </Card>
-        </Col>
-      </Row>
+        </div>
+      </div>
     </div>
   );
 }
