@@ -1,0 +1,14 @@
+2026-11-04 AIPulse frontend acceptance
+backend pytest: 45 passed, 7 upstream deprecation warnings (run from backend/)
+backend changed-file ruff: passed
+backend mypy app: success, 95 source files (existing annotation note)
+frontend TypeScript: passed
+frontend unit: 10 passed across 5 files
+frontend production build: passed, 2 asset/entry size warnings, entry approximately 1.2 MiB
+full isolated browser suite: 12 passed in approximately 1.3 minutes
+browser navigation smoke: 26 destinations; no script errors or API error responses
+visual evidence refresh: 3 passed in 15.7 seconds
+final affected workflow paths after label/status polish: 2 passed in 23.0 seconds
+real model smoke: ordinary-user chat/history, publication, embedding/rerank, grounded calculator and 3-agent pipeline passed
+npm audit snapshot: 0 known vulnerabilities on 2026-11-04
+git diff --check: passed

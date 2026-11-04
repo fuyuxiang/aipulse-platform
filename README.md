@@ -53,6 +53,16 @@ AIPulse 是企业级智能体管理平台，采用 Control Plane + Runtime Plane
 
 ---
 
+## 当前验证边界
+
+当前交付为本地开发版。已完成源码评审、核心缺陷整改以及隔离测试环境的真实模型调用；详细证据与剩余试点门槛见 [产品与技术评审](docs/reviews/aipulse-product-technical-review.md) 和 [验收结果](docs/reviews/aipulse-acceptance-results.md)。
+
+- `echo_agent_native` / `local` 模型是演示 Provider；媒体 `local://` 引用不代表实际文件。真实模型使用明确配置的 Provider 和凭证环境变量。
+- 聊天当前为缓冲结果 SSE，尚非原生 Token 流式。停止接收不等于撤销已发出的外部调用。
+- Team 有流水线等编排与执行历史，尚无正式产物验收/退回机制。评测当前支持导入已有答案评分。
+- API 发布固定 Agent 配置快照；依赖的模型、工具、知识库仍可变化。widget/渠道配置记录不能替代真实投递验收。
+- 原始 Runtime 与标准 AgentRunner 的桥接能力尚未完全一致；单机检查点恢复不等于分布式任务接管。
+
 ## Features
 
 | 领域 | 能力 |
@@ -140,7 +150,7 @@ aipulse-platform/
 │   ├── adapter/              # EchoAgentRuntimeAdapter
 │   ├── executors/            # Task & workflow executors
 │   └── storage/              # Local storage backends
-├── echo-agent/         # Agent Engine (submodule, unmodified)
+├── echo-agent/         # Agent Engine (tracked source snapshot, unmodified)
 ├── frontend/           # React + TypeScript + Ant Design Pro
 │   └── src/
 ├── scripts/            # Init, start, test, cleanup

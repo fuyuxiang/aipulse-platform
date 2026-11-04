@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-04",
+  "vulnerabilities": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "dependencies": {
+    "prod": 184,
+    "dev": 579,
+    "optional": 28,
+    "peer": 7,
+    "peerOptional": 0,
+    "total": 762
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "before-agents.png": {
+    "bytes": 110901,
+    "sha256": "27eb7c17dbbd38a3e89f64bff2d879ba4c9a76fa63309c702696cd7dba3ccdf9"
+  },
+  "dependency-audit.json": {
+    "bytes": 285,
+    "sha256": "45348f3c2ff89a45fe7c858c8fd5de16c6a812ad85edd3504861b4076070084e"
+  },
+  "environment.json": {
+    "bytes": 395,
+    "sha256": "4931702d90625921fb2116d735e5d3810f8d6c5a4ab56b66dde9fcb863da1666"
+  },
+  "ordinary-user-chat.png": {
+    "bytes": 56806,
+    "sha256": "1d06d154555756d94569428b7605e98df0103520f1581db984f5fe6c0f39e924"
+  },
+  "real-model-results.json": {
+    "bytes": 1352,
+    "sha256": "baa168cb4a11c43ad9a2969ed87b67825bfb51e374fe7acc0b203a7c9a6210c1"
+  },
+  "resource-list.png": {
+    "bytes": 67968,
+    "sha256": "76a976ccc8c96698915735febeb992650af4027b7252296d353d5b47820bb977"
+  },
+  "source-sha256.json": {
+    "bytes": 6259,
+    "sha256": "504aae36b18b24fca4ecb971f8c69a2156c1b2e25e96d472b340e14774efde07"
+  },
+  "team-history.png": {
+    "bytes": 99118,
+    "sha256": "8f1060f2a3bc3118b73ad59a1370d683e63ee1e9380112dd5fe6b455f463000b"
+  },
+  "validation-summary.txt": {
+    "bytes": 873,
+    "sha256": "ef00ad48071697859b773b4da6d08422c216cf02659c79a64e148105dda6e708"
+  },
+  "workflow-approval-result.png": {
+    "bytes": 75230,
+    "sha256": "8703bb47d2d442349d61d44f934303a19728995ee36a0a59e35c12742d6b2359"
+  },
+  "workflow-designer.png": {
+    "bytes": 83757,
+    "sha256": "1f78732cfc1c2efabeb6987d9c21635b7231707a942cb756f7532fc6a9fe4c02"
+  },
+  "workspace-mobile.png": {
+    "bytes": 75694,
+    "sha256": "95780334e9ce3379cedbf6ee8fe35cbfeca5abee950a36496f5f1e5b45a7f1df"
+  },
+  "workspace.png": {
+    "bytes": 119422,
+    "sha256": "1ed6cb5819bc952a3589a2d8e885c0ec93a09edef4ef6fd4d6c3b85a30a2ba3d"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-04",
+  "commit": "9f67c79547f33e71d86025571a625c83f36433c0",
+  "branch": "main",
+  "python": "3.11.11",
+  "node": "v20.19.0",
+  "browser": "Chromium headless shell 1243",
+  "browser_base_url": "http://127.0.0.1:3100",
+  "api_base_url": "http://127.0.0.1:8107",
+  "data": "isolated temporary SQLite/files/vector store",
+  "e2e_workers": 2,
+  "production_deployment": false
+}
