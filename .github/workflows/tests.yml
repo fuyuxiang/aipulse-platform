@@ -1,3 +1,4 @@
+# Keep this path stable to preserve GitHub's workflow identity and history.
 name: AIPulse CI
 
 on:

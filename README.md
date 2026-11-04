@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fuyuxiang/aipulse-platform/actions/workflows/ci.yml"><img alt="AIPulse CI" src="https://github.com/fuyuxiang/aipulse-platform/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/fuyuxiang/aipulse-platform/actions/workflows/tests.yml"><img alt="AIPulse CI" src="https://github.com/fuyuxiang/aipulse-platform/actions/workflows/tests.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
   <img alt="React 18" src="https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white">
   <img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
@@ -291,14 +291,14 @@ npm run e2e
 
 ### 持续集成与发布
 
-[AIPulse CI](.github/workflows/ci.yml) 在推送 `main`、向 `main` 发起或更新 PR，以及手动触发时执行。使用 GitHub 托管的 Ubuntu Runner，无需自建 Runner 或额外密钥。
+[AIPulse CI](.github/workflows/tests.yml) 在推送 `main`、向 `main` 发起或更新 PR，以及手动触发时执行。使用 GitHub 托管的 Ubuntu Runner，无需自建 Runner 或额外密钥。
 
 - **Python 3.11 / 3.12**：Ruff、mypy、后端测试、Runtime 与引擎集成测试，以及全新数据库迁移和初始化。
 - **Node.js 22**：锁文件安装、依赖审计、TypeScript 检查、单元测试和生产构建。
 - **浏览器回归**：隔离数据环境中的完整 Chromium 业务测试，保留 HTML 报告、截图与失败 Trace。
 - **统一结果**：只有所有检查成功，`CI passed` 才通过；前端构建与测试报告作为 Actions 产物保留 7 天。
 
-[发布工作流](.github/workflows/publish.yml) 由 `vMAJOR.MINOR.PATCH` 或带预发布后缀的标签触发，复用完整 CI 后生成源码包、前端静态资源包和 SHA-256 校验文件，再创建 GitHub Release。真实模型验收仍为显式运行的独立步骤，不使用 CI 自动调用外部模型。
+[发布工作流](.github/workflows/release.yml) 由 `vMAJOR.MINOR.PATCH` 或带预发布后缀的标签触发，复用完整 CI 后生成源码包、前端静态资源包和 SHA-256 校验文件，再创建 GitHub Release。真实模型验收仍为显式运行的独立步骤，不使用 CI 自动调用外部模型。
 
 ## 项目状态与演进方向
 

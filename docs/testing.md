@@ -2,7 +2,7 @@
 
 ## GitHub Actions
 
-平台工作流为 [ci.yml](../.github/workflows/ci.yml) 和 [publish.yml](../.github/workflows/publish.yml)。原有 RAGFlow 测试、定时发布、自建 `ragflow-test` Runner、Docker Hub / PyPI 发布配置已移除。
+平台工作流为 [tests.yml](../.github/workflows/tests.yml)（AIPulse CI）和 [release.yml](../.github/workflows/release.yml)（AIPulse Release）。保留文件路径以延续 GitHub 已有工作流身份与历史记录；原有 RAGFlow 测试、定时发布、自建 `ragflow-test` Runner、Docker Hub / PyPI 发布配置已移除。
 
 ### 触发与检查
 
@@ -29,11 +29,13 @@ Python 工具链固定在 [requirements-ci.txt](../requirements-ci.txt)；应用
 
 ### 发布验证
 
-发布标签采用 `vMAJOR.MINOR.PATCH` 或 `vMAJOR.MINOR.PATCH-rc.1` 等格式。标签触发 `publish.yml`，先调用同一份 CI；全部通过后打包源码、下载已验证的前端构建并生成 `SHA256SUMS`，上传至该标签的 GitHub Release。预发布标签生成 prerelease，工作流不再定时移动 `nightly` 标签，也不发布 RAGFlow 镜像或 SDK。
+发布标签采用 `vMAJOR.MINOR.PATCH` 或 `vMAJOR.MINOR.PATCH-rc.1` 等格式。标签触发 `release.yml`，先调用同一份 CI；全部通过后打包源码、下载已验证的前端构建并生成 `SHA256SUMS`，上传至该标签的 GitHub Release。预发布标签生成 prerelease，工作流不再定时移动 `nightly` 标签，也不发布 RAGFlow 镜像或 SDK。
 
 默认作业只有 `contents: read`；仅最后的 Release 作业具有 `contents: write`。推送 `main` 不会创建 Release，也不会部署业务环境。
 
-若 GitHub 上曾有因长期无活动停用的历史工作流，应以新工作流的运行结果为准。工作流启停可在 Actions 页管理，具体方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)。工作流通过、分支保护启用和生产部署是不同状态，不能相互替代。
+首次迁移时，若 Actions 侧边栏仍以旧名称 `tests`、`release` 显示且标注 Disabled，可分别打开并点击 **Enable workflow**。它们对应上述保留的文件路径，启用后执行 AIPulse 配置。随后在测试工作流中点击 **Run workflow**，选择 `main` 手动验收；发布工作流仍仅由版本标签触发。
+
+工作流启停可在 Actions 页管理，具体方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)。工作流通过、分支保护启用和生产部署是不同状态，不能相互替代。
 
 ## 本地检查
 

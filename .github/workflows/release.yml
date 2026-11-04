@@ -1,3 +1,4 @@
+# Keep this path stable to preserve GitHub's workflow identity and history.
 name: AIPulse Release
 
 on:
@@ -18,7 +19,7 @@ defaults:
 jobs:
   validate:
     name: Validate release
-    uses: ./.github/workflows/ci.yml
+    uses: ./.github/workflows/tests.yml
     permissions:
       contents: read
 
