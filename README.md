@@ -18,7 +18,7 @@
   <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
   <img alt="React 18" src="https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white">
   <img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
-  <img alt="License: Proprietary" src="https://img.shields.io/badge/License-Proprietary-64748B">
+  <img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-64748B">
 </p>
 
 <p align="center">
@@ -344,6 +344,6 @@ npm run e2e
 
 ## 许可
 
-AIPulse 平台沿用当前仓库的专有授权声明：**Proprietary. All rights reserved.**
+本项目原创代码采用 [PolyForm Noncommercial License 1.0.0](LICENSE)，允许许可证规定的非商业用途。超出许可范围的商业用途需事先取得另行授权，请联系仓库维护者。
 
-Echo Agent 的 MIT 许可声明见其 [pyproject.toml](echo-agent/pyproject.toml)。第三方组件遵循各自的许可约定。
+仓库内的 Echo Agent 与后端代码采用相同的项目许可证。第三方组件保留各自的许可证。此前已按其他许可证授予的权利不受本次更新影响。

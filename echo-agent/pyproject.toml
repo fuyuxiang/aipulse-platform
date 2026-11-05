@@ -8,13 +8,12 @@ version = "0.1.0"
 description = "A modular AI agent framework with multi-channel support"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "PolyForm-Noncommercial-1.0.0" }
 authors = [{ name = "Echo Agent contributors" }]
 keywords = ["ai", "agent", "assistant", "chatbot", "runtime"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
@@ -60,6 +59,7 @@ include = [
     "skills/**/*.py",
     "skills/**/*.sh",
     "README.md",
+    "LICENSE",
     "scripts/install.sh",
 ]
 
@@ -78,6 +78,7 @@ include = [
     "skills/",
     "scripts/install.sh",
     "README.md",
+    "LICENSE",
     "pyproject.toml",
 ]
 

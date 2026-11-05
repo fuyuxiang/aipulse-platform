@@ -15,7 +15,7 @@
 <p align="center">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB.svg?logo=python&logoColor=white&style=for-the-badge">
   <img alt="Status Alpha" src="https://img.shields.io/badge/status-alpha-f59e0b.svg?style=for-the-badge">
-  <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>
+  <a href="LICENSE"><img alt="License PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue.svg?style=for-the-badge"></a>
   <img alt="Self Hosted" src="https://img.shields.io/badge/self--hosted-111827?style=for-the-badge">
 </p>
 
@@ -295,4 +295,6 @@ echo-agent run -w .
 
 ## License
 
-MIT
+Original project code is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) for the purposes permitted by that license. Commercial uses outside those purposes require separate permission from the maintainers.
+
+Third-party components retain their respective licenses. This update does not revoke rights already granted under earlier licenses.
